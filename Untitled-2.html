@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نظام المخزون السحابي - تطبيق FIFO الفعلي</title>
+    <style>
+        :root { 
+            --primary: #2c3e50; 
+            --success: #27ae60; 
+            --warning: #f39c12; 
+            --danger: #c0392b; 
+            --fifo-color: #2980b9;
+        }
+        body { font-family: 'Segoe UI', sans-serif; background-color: #eef2f3; padding: 20px; direction: rtl; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        h1 { text-align: center; color: var(--primary); margin-bottom: 5px; }
+        .subtitle { text-align: center; color: #666; margin-bottom: 25px; }
+        
+        .grid-forms { display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 20px; margin-bottom: 20px; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .form-group { display: flex; flex-direction: column; gap: 15px; }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        
+        input, select, button { width: 100%; padding: 11px; border-radius: 4px; border: 1px solid #ccc; box-sizing: border-box; font-size: 14px; }
+        label { font-weight: bold; margin-bottom: 2px; color: var(--primary); }
+        
+        button { color: white; font-weight: bold; cursor: pointer; border: none; }
+        .btn-add { background-color: var(--success); }
+        .btn-out { background-color: var(--fifo-color); }
+        button:disabled { background-color: #ccc; cursor: not-allowed; }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { padding: 12px; text-align: right; border-bottom: 1px solid #ddd; }
+        th { background-color: var(--primary); color: white; }
+        
+        .badge { padding: 5px 10px; border-radius: 4px; color: white; font-size: 12px; font-weight: bold; }
+        .badge-safe { background-color: var(--success); }
+        .badge-warning { background-color: var(--warning); }
+        .badge-expired { background-color: var(--danger); }
+        
+        .badge-fifo { background-color: #ebf5fb; color: var(--fifo-color); border: 1px solid var(--fifo-color); padding: 4px 8px; border-radius: 4px; font-size: 12px; }
+        .fifo-first { background-color: #fcf3cf; }
+
+        #loading { text-align: center; font-weight: bold; color: #7f8c8d; display: none; margin-bottom: 15px; background: #eaeded; padding: 10px; border-radius: 5px; border: 1px solid #bdc3c7;}
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>☁️ نظام المخزون والصلاحيات السحابي (FIFO)</h1>
+    <div class="subtitle">تزامن فوري وتحديث تلقائي بين جميع الأجهزة عبر السحاب</div>
+    <div id="loading">🔄 جاري الاتصال بقاعدة البيانات السحابية ومزامنة البيانات...</div>
+
+    <div class="grid-forms">
+        <!-- إضافة شحنة جديدة -->
+        <div class="card">
+            <h3>📥 توريد / إضافة شحنة جديدة</h3>
+            <form id="productForm" class="form-group">
+                <div>
+                    <label>اسم المنتج:</label>
+                    <input type="text" id="prodName" required placeholder="مثال: جبنة دومتي">
+                </div>
+                <div class="form-row">
+                    <div>
+                        <label>الكمية الواردة:</label>
+                        <input type="number" id="prodQty" min="1" required placeholder="0">
+                    </div>
+                    <div>
+                        <label>تاريخ انتهاء الصلاحية:</label>
+                        <input type="date" id="prodExpiry" required>
+                    </div>
+                </div>
+                <button type="submit" id="btnAddSubmit" class="btn-add">حفظ وإرسال للسحاب ➕</button>
+            </form>
+        </div>
+
+        <!-- صرف كمية بناءً على FIFO -->
+        <div class="card">
+            <h3>📤 صرف كمية من منتج (آلية FIFO السحابية)</h3>
+            <form id="dispatchForm" class="form-group">
+                <div>
+                    <label>اختر المنتج المراد صرفه:</label>
+                    <select id="dispatchName" required>
+                        <option value="">-- جاري تحميل المنتجات... --</option>
+                    </select>
+                </div>
+                <div>
+                    <label>إجمالي الكمية المطلوبة للخروج:</label>
+                    <input type="number" id="dispatchQty" min="1" required placeholder="أدخل الكمية المطلوبة">
+                </div>
+                <button type="submit" id="btnOutSubmit" class="btn-out">تنفيذ الصرف السحابي (FIFO) 🚀</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- جدول المخزون المتاح حالياً -->
+    <div class="card">
+        <h3>📊 الأرصدة الحالية في المخزن (مزامنة حية)</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th>حالة الشحنة</th>
+                    <th>اسم المنتج</th>
+                    <th>الكمية المتاحة حالياً</th>
+                    <th>تاريخ انتهاء الصلاحية</th>
+                    <th>الأيام المتبقية</th>
+                    <th>وضع الصلاحية</th>
+                </tr>
+            </thead>
+            <tbody id="productTableBody"></tbody>
+        </table>
+    </div>
+</div>
+
+<script {nonce}>
+    // الرابط السحابي الخاص بك جاهز ومدمج هنا
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxzttwVfez8sKAFbeOCk16cJnoD8MqQVIMNCF7uT4obUQ1oyHJ3Bskr3Efz1HrI8Pt4/exec";
+
+    const productForm = document.getElementById('productForm');
+    const dispatchForm = document.getElementById('dispatchForm');
+    const productTableBody = document.getElementById('productTableBody');
+    const dispatchNameSelect = document.getElementById('dispatchName');
+    const loadingDiv = document.getElementById('loading');
+    const btnAddSubmit = document.getElementById('btnAddSubmit');
+    const btnOutSubmit = document.getElementById('btnOutSubmit');
+    
+    let products = [];
+
+    function toggleControls(isLoading) {
+        loadingDiv.style.display = isLoading ? 'block' : 'none';
+        btnAddSubmit.disabled = isLoading;
+        btnOutSubmit.disabled = isLoading;
+    }
+
+    // 1. جلب البيانات من جوجل شيت وفرزها بالـ FIFO
+    async function fetchProducts() {
+        toggleControls(true);
+        try {
+            const response = await fetch(SCRIPT_URL);
+            products = await response.json();
+            // فرز المخزون طبقاً لتاريخ الانتهاء الأقرب أولاً (قاعدة FIFO الأساسية)
+            products.sort((a, b) => new Date(a.expiry) - new Date(b.expiry));
+            renderTable();
+            updateSelectOptions();
+        } catch (error) { 
+            console.error(error);
+            alert("خطأ في جلب البيانات السحابية، تأكد من اتصال الإنترنت أو إعدادات الشيت.");
+        }
+        toggleControls(false);
+    }
+
+    // 2. مزامنة وإرسال الأرصدة المحدثة كاملة إلى جوجل شيت
+    async function syncWithCloud() {
+        toggleControls(true);
+        try {
+            // استخدام FormData كحيلة برمجية ذكية لتفادي مشاكل الحماية (CORS) مع متصفحات الموبايل والكروم
+            const formData = new FormData();
+            formData.append('json', JSON.stringify({ products: products }));
+
+            await fetch(SCRIPT_URL, {
+                method: 'POST',
+                body: JSON.stringify({ products: products })
+            });
+            
+            // تحديث الجدول محلياً فوراً لمنح المستخدم تجربة سريعة بدون انتظار السيرفر
+            renderTable();
+            updateSelectOptions();
+            
+            // جلب البيانات مجدداً من السيرفر بعد ثانية للتأكد التام من الحفظ الثابت
+            setTimeout(fetchProducts, 1000);
+        } catch (error) {
+            alert("فشلت عملية المزامنة السحابية.");
+            toggleControls(false);
+        }
+    }
+
+    // حساب وضع الصلاحية
+    function getExpiryStatus(expiryDateStr) {
+        const today = new Date(); today.setHours(0,0,0,0);
+        const expiryDate = new Date(expiryDateStr); expiryDate.setHours(0,0,0,0);
+        const daysLeft = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
+        
+        if (daysLeft < 0) return { daysLeft, badge: '<span class="badge badge-danger">منتهي ❌</span>' };
+        if (daysLeft <= 30) return { daysLeft, badge: '<span class="badge badge-warning">قريب ⚠️</span>' };
+        return { daysLeft, badge: '<span class="badge badge-success">آمن ✅</span>' };
+    }
+
+    // تحديث القائمة المنسدلة للصرف
+    function updateSelectOptions() {
+        const distinctNames = [...new Set(products.map(p => p.name))];
+        dispatchNameSelect.innerHTML = '<option value="">-- اختر المنتج المراد صرفه --</option>';
+        distinctNames.forEach(name => {
+            const totalQty = products.filter(p => p.name === name).reduce((sum, p) => sum + p.qty, 0);
+            if(totalQty > 0) {
+                const option = document.createElement('option');
+                option.value = name;
+                option.textContent = `${name} (إجمالي المتاح: ${totalQty})`;
+                dispatchNameSelect.appendChild(option);
+            }
+        });
+    }
+
+    // بناء الجدول للمستخدم
+    function renderTable() {
+        productTableBody.innerHTML = products.length === 0 ? `<tr><td colspan="6" style="text-align:center;">المخزن فارغ سحابياً.</td></tr>` : '';
+        const trackedFirst = {};
+
+        products.forEach((product) => {
+            if (product.qty <= 0) return;
+            const { daysLeft, badge } = getExpiryStatus(product.expiry);
+            
+            let fifoClass = ''; let fifoLabel = 'شحنة تالية ⏳';
+            if (!trackedFirst[product.name]) {
+                trackedFirst[product.name] = true;
+                fifoClass = 'fifo-first';
+                fifoLabel = 'إصرف هذه أولاً (FIFO) 🚀';
+            }
+
+            const row = document.createElement('tr');
+            if(fifoClass) row.className = fifoClass;
+
+            row.innerHTML = `
+                <td><span class="badge-fifo">${fifoLabel}</span></td>
+                <td><b>${product.name}</b></td>
+                <td><b>${product.qty}</b></td>
+                <td>${product.expiry}</td>
+                <td>${daysLeft < 0 ? `منتهي` : `${daysLeft} يوم`}</td>
+                <td>${badge}</td>
+            `;
+            productTableBody.appendChild(row);
+        });
+    }
+
+    // إضافة منتج جديد
+    productForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const name = document.getElementById('prodName').value.trim();
+        const qty = parseInt(document.getElementById('prodQty').value);
+        const expiry = document.getElementById('prodExpiry').value;
+
+        products.push({ name, qty, expiry });
+        productForm.reset();
+        await syncWithCloud();
+    });
+
+    // سحب الكميات بنظام FIFO الذكي
+    dispatchForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const targetName = dispatchNameSelect.value;
+        let requestedQty = parseInt(document.getElementById('dispatchQty').value);
+
+        const totalAvailable = products.filter(p => p.name === targetName).reduce((sum, p) => sum + p.qty, 0);
+
+        if (requestedQty > totalAvailable) {
+            alert(`الكمية غير كافية بالسحاب! المتاح فقط هو: ${totalAvailable}`);
+            return;
+        }
+
+        // تفكيك الخصم على الشحنات الأقدم بالترتيب
+        for (let i = 0; i < products.length; i++) {
+            if (products[i].name === targetName && requestedQty > 0) {
+                if (products[i].qty >= requestedQty) {
+                    products[i].qty -= requestedQty;
+                    requestedQty = 0;
+                    break;
+                } else {
+                    requestedQty -= products[i].qty;
+                    products[i].qty = 0;
+                }
+            }
+        }
+
+        // تصفية المخزن من السطور التي أصبحت صفراً
+        products = products.filter(p => p.qty > 0);
+        
+        dispatchForm.reset();
+        await syncWithCloud();
+    });
+
+    // تحميل البيانات فور فتح الصفحة مباشرة
+    fetchProducts();
+</script>
+</body>
+</html>
