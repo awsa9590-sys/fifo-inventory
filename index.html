@@ -46,7 +46,7 @@
         <section class="lg:col-span-5 flex flex-col gap-6">
             
             <!-- 1. نموذج توريد شحنة جديدة (Inbound) -->
-            <div class="bg-[#141414] border border-zinc-800 rounded-2xl p-5 shadow-xl relative overflow-hidden">
+            <div class="bg-[#141414] border border-zinc-800 rounded-2xl p-5 shadow-xl">
                 <div class="flex items-center gap-2 mb-4 border-b border-zinc-800 pb-3">
                     <span class="text-xl">📥</span>
                     <h2 class="text-lg font-black text-white">توريد / إضافة شحنة جديدة</h2>
@@ -132,12 +132,7 @@
                             </tr>
                         </thead>
                         <tbody id="inventoryTableBody" class="divide-y divide-zinc-800 font-medium">
-                            <!-- يتم توليد الصفوف ديناميكياً بواسطة جافا سكريبت الخاصة بك -->
-                            <tr id="loadingRow">
-                                <td colspan="5" class="px-4 py-8 text-center text-zinc-500 font-bold">
-                                    جاري تحميل بيانات المخزن السحابي...
-                                </td>
-                            </tr>
+                            <!-- يتم توليد الصفوف ديناميكياً بواسطة الجافا سكريبت -->
                         </tbody>
                     </table>
                 </div>
@@ -147,13 +142,169 @@
 
     </main>
 
-    <!-- أسفل الصفحة (Footer) -->
+    <!-- أسفل الصفحة -->
     <footer class="bg-[#141414] border-t border-zinc-800 text-center py-4 text-xs text-zinc-500 font-medium">
         <p>© 2026 نظام إدارة FIFO السحابي - مخصص لصالح فروع بافلو برجر</p>
     </footer>
 
-    <!-- ادراج ملفات Firebase و الجافا سكريبت الخاصة بك بالأسفل هنا -->
-    <!-- تأكد من نقل كود الـ JavaScript الخاص بك أو تركه كما هو مفعّل بمشروعك ليرتبط بالـ IDs المذكورة أعلاه -->
+    <!-- ========================================== -->
+    <!-- هنا نقوم بربط كود الـ JavaScript والـ Firebase الخاص بمشروعك الأساسي -->
+    <!-- ========================================== -->
+    <script type="module">
+        // استيراد حزم Firebase المعتمدة في مشروعك
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getDatabase, ref, push, onValue, update } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
 
+        // إعدادات الـ Firebase الخاصة بـ الفايربيس الخاص بك
+        const firebaseConfig = {
+            databaseURL: "https://fifo-inventory-default-rtdb.firebaseio.com" 
+        };
+
+        // تهيئة التطبيق وقاعدة البيانات
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        const inventoryRef = ref(db, "inventory");
+
+        // الإمساك بعناصر الواجهة المطورة بالتصميم الجديد
+        const inboundForm = document.getElementById("inboundForm");
+        const outboundForm = document.getElementById("outboundForm");
+        const outboundProductSelect = document.getElementById("outboundProductSelect");
+        const inventoryTableBody = document.getElementById("inventoryTableBody");
+
+        let currentInventory = [];
+
+        // 1. استقبال البيانات وتحديث الجدول سحابياً فورياً
+        onValue(inventoryRef, (snapshot) => {
+            const data = snapshot.val();
+            currentInventory = [];
+            inventoryTableBody.innerHTML = "";
+            outboundProductSelect.innerHTML = '<option value="">-- اختر المنتج من القائمة --</option>';
+
+            if (data) {
+                // تحويل البيانات المصفوفة لترتيبها حسب تاريخ انتهاء الصلاحية
+                for (let key in data) {
+                    currentInventory.push({ id: key, ...data[key] });
+                }
+
+                // ترتيب الشحنات (الأقرب لانتهاء الصلاحية أولاً)
+                currentInventory.sort((a, b) => new Date(a.expiryDate) - new Date(b.expiryDate));
+
+                const uniqueProducts = new Set();
+
+                currentInventory.forEach(item => {
+                    if (item.quantity > 0) {
+                        uniqueProducts.add(item.productName);
+
+                        // حساب الأيام المتبقية
+                        const today = new Date();
+                        const expiry = new Date(item.expiryDate);
+                        const timeDiff = expiry - today;
+                        const daysLeft = Math.ceil(timeDiff / (1000 * 60 * 60 * 24));
+
+                        // تحديد لون الشارة ووضع الصلاحية بالتيم الداكن الجديد
+                        let statusBadge = "";
+                        let daysText = `${daysLeft} يوم`;
+
+                        if (daysLeft <= 0) {
+                            statusBadge = `<span class="inline-block bg-red-950 text-red-400 border border-red-800 text-[11px] px-2.5 py-1 rounded-full font-bold">❌ منتهي الصلاحية</span>`;
+                            daysText = `<span class="text-red-500 font-bold">منتهي</span>`;
+                        } else if (daysLeft <= 7) {
+                            statusBadge = `<span class="inline-block bg-amber-950 text-amber-400 border border-amber-900 text-[11px] px-2.5 py-1 rounded-full font-bold">⚠️ قريب الانتهاء</span>`;
+                            daysText = `<span class="text-amber-500 font-bold">${daysLeft} أيام!</span>`;
+                        } else {
+                            statusBadge = `<span class="inline-block bg-emerald-950 text-emerald-400 border border-emerald-900 text-[11px] px-2.5 py-1 rounded-full font-bold">🟢 طازج وآمن</span>`;
+                        }
+
+                        // إنشاء الصف بالخلفية الجديدة
+                        const row = document.createElement("tr");
+                        row.className = "hover:bg-[#1a1a1a] transition-colors";
+                        row.innerHTML = `
+                            <td class="px-4 py-4 font-bold text-white">${item.productName}</td>
+                            <td class="px-4 py-4 text-center font-bold text-zinc-300">${item.quantity}</td>
+                            <td class="px-4 py-4 text-center text-zinc-400 text-xs">${item.expiryDate}</td>
+                            <td class="px-4 py-4 text-center">${daysText}</td>
+                            <td class="px-4 py-4 text-center">${statusBadge}</td>
+                        `;
+                        inventoryTableBody.appendChild(row);
+                    }
+                });
+
+                // تفعيل قائمة خيارات الصرف بالمنتجات المتوفرة
+                uniqueProducts.forEach(prod => {
+                    const opt = document.createElement("option");
+                    opt.value = prod;
+                    opt.textContent = prod;
+                    outboundProductSelect.appendChild(opt);
+                });
+            } else {
+                inventoryTableBody.innerHTML = `<tr><td colspan="5" class="px-4 py-8 text-center text-zinc-600 font-bold">المخزن فارغ حالياً، قم بتوريد شحنة أولاً.</td></tr>`;
+            }
+        });
+
+        // 2. معالجة حفظ شحنة جديدة في السحاب (Inbound)
+        inboundForm.addEventListener("submit", (e) => {
+            e.preventDefault();
+            const productName = document.getElementById("productName").value.trim();
+            const quantity = parseInt(document.getElementById("quantityIn").value);
+            const expiryDate = document.getElementById("expiryDate").value;
+
+            if (productName && quantity > 0 && expiryDate) {
+                push(inventoryRef, {
+                    productName: productName,
+                    quantity: quantity,
+                    expiryDate: expiryDate,
+                    timestamp: Date.now()
+                }).then(() => {
+                    inboundForm.reset();
+                    alert("✅ تم حفظ الشحنة الجديدة وإرسالها للسحاب بنجاح!");
+                }).catch((error) => {
+                    alert("❌ فشل الاتصال بالسحاب: " + error.message);
+                });
+            }
+        });
+
+        // 3. معالجة صرف الكميات بناءً على آلية FIFO السحابية الذكية
+        outboundForm.addEventListener("submit", (e) => {
+            e.preventDefault();
+            const selectedProduct = outboundProductSelect.value;
+            let requiredQty = parseInt(document.getElementById("quantityOut").value);
+
+            if (!selectedProduct || requiredQty <= 0) return;
+
+            // فلترة الشحنات المتاحة لهذا المنتج فقط مرتبة من الأقدم للأحدث لقاعدة FIFO
+            const batches = currentInventory.filter(item => item.productName === selectedProduct && item.quantity > 0);
+            
+            let totalAvailable = batches.reduce((sum, item) => sum + item.quantity, 0);
+
+            if (requiredQty > totalAvailable) {
+                alert(`⚠️ الكمية المطلوبة غير متوفرة بالكامل! المتاح في السحاب هو ${totalAvailable} فقط.`);
+                return;
+            }
+
+            const updates = {};
+            
+            // تطبيق خصم الـ FIFO بالتتابع على المستندات
+            for (let i = 0; i < batches.length; i++) {
+                if (requiredQty <= 0) break;
+
+                let batch = batches[i];
+                if (batch.quantity >= requiredQty) {
+                    updates[`/inventory/${batch.id}/quantity`] = batch.quantity - requiredQty;
+                    requiredQty = 0;
+                } else {
+                    updates[`/inventory/${batch.id}/quantity`] = 0;
+                    requiredQty -= batch.quantity;
+                }
+            }
+
+            // تحديث السحاب دفعة واحدة
+            update(ref(db), updates).then(() => {
+                outboundForm.reset();
+                alert(`📥 تم صرف الكمية بنجاح وفقاً لقاعدة FIFO وتحديث السحاب!`);
+            }).catch((error) => {
+                alert("❌ حدث خطأ أثناء تحديث السحاب: " + error.message);
+            });
+        });
+    </script>
 </body>
 </html>
