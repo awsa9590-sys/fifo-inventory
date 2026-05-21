@@ -4,36 +4,159 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>نظام مخزون بافلو برجر - FIFO</title>
-    <!-- تضمين مكتبة Tailwind CSS -->
+    <!-- تضمين Tailwind CSS وخط Cairo للمظهر الاحترافي -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- تضمين خط Cairo الفخم والمناسب للمطاعم -->
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet">
     <style>
-        body {
-            font-family: 'Cairo', sans-serif;
-            background-color: #0b0b0b;
-        }
-        /* تخصيص السكرول بار ليتماشى مع الثيم الداكن */
-        ::-webkit-scrollbar { width: 8px; }
+        body { font-family: 'Cairo', sans-serif; background-color: #0c0c0c; }
+        ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: #111; }
-        ::-webkit-scrollbar-thumb { background: #BD1A22; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: #BD1A22; border-radius: 3px; }
     </style>
 </head>
 <body class="text-gray-100 min-h-screen flex flex-col justify-between">
 
-    <!-- الـ Header الشبيه ببراند بافلو برجر -->
-    <header class="bg-[#121212] border-b-4 border-[#BD1A22] shadow-2xl py-4 px-6">
+    <!-- شريط الرأس (Header) -->
+    <header class="bg-[#141414] border-b-[3px] border-[#BD1A22] shadow-2xl py-4 px-6">
         <div class="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
             <div class="flex items-center gap-4">
-                <!-- شعار تعبيري مستوحى من البراند -->
-                <div class="bg-[#BD1A22] text-white p-3 rounded-xl font-black text-2xl tracking-wider shadow-lg transform -rotate-2">
+                <div class="bg-[#BD1A22] text-white px-4 py-2 rounded-xl font-black text-2xl tracking-wider shadow-lg transform -rotate-1">
                     BUFFALO
                 </div>
                 <div>
-                    <h1 class="text-xl sm:text-2xl font-black tracking-wide text-white">نظام إدارة المخازن والصلاحيات السحابي</h1>
-                    <p class="text-xs text-gray-400 font-semibold tracking-widest mt-0.5">KITCHEN INVENTORY SYSTEM • FIFO</p>
+                    <h1 class="text-xl sm:text-2xl font-black tracking-wide text-white">نظام المخزون والصلاحيات السحابي (FIFO)</h1>
+                    <p class="text-xs text-gray-400 font-semibold tracking-wider mt-0.5">KITCHEN INVENTORY SYSTEM • REALTIME SYNC</p>
                 </div>
             </div>
+            <!-- مؤشر حالة الاتصال السحابي -->
+            <div class="flex items-center gap-2 bg-[#1c1c1c] px-4 py-2 rounded-full border border-zinc-800">
+                <span class="relative flex h-3 w-3">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                </span>
+                <span class="text-xs font-bold text-gray-300">متصل بالسحاب (مزامنة حية)</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- المحتوى الرئيسي للموقع -->
+    <main class="max-w-7xl mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 w-full flex-grow">
+        
+        <!-- العمود الأيمن: عمليات التوريد والصرف (5 أعمدة) -->
+        <section class="lg:col-span-5 flex flex-col gap-6">
+            
+            <!-- 1. نموذج توريد شحنة جديدة (Inbound) -->
+            <div class="bg-[#141414] border border-zinc-800 rounded-2xl p-5 shadow-xl relative overflow-hidden">
+                <div class="flex items-center gap-2 mb-4 border-b border-zinc-800 pb-3">
+                    <span class="text-xl">📥</span>
+                    <h2 class="text-lg font-black text-white">توريد / إضافة شحنة جديدة</h2>
+                </div>
+                
+                <form id="inboundForm" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-400 mb-1.5">اسم المنتج / المادة الخام</label>
+                        <input type="text" id="productName" required placeholder="مثال: لحم بافلو 150ج، خبز بريوش" 
+                               class="w-full bg-[#1c1c1c] border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-[#BD1A22] transition-colors font-medium">
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-gray-400 mb-1.5">الكمية الواردة</label>
+                            <input type="number" id="quantityIn" required placeholder="00" min="1" 
+                                   class="w-full bg-[#1c1c1c] border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#BD1A22] transition-colors text-center font-bold">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-gray-400 mb-1.5">تاريخ انتهاء الصلاحية</label>
+                            <input type="date" id="expiryDate" required 
+                                   class="w-full bg-[#1c1c1c] border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#BD1A22] transition-colors font-medium">
+                        </div>
+                    </div>
+                    <button type="submit" class="w-full bg-[#BD1A22] hover:bg-[#a3141b] text-white font-bold py-3 px-4 rounded-xl transition-all duration-200 shadow-md shadow-[#bd1a2233] hover:shadow-[#bd1a2255] flex items-center justify-center gap-2 mt-2 text-sm uppercase tracking-wider">
+                        حفظ وإرسال للسحاب ➕
+                    </button>
+                </form>
+            </div>
+
+            <!-- 2. نموذج صرف كمية (Outbound - FIFO) -->
+            <div class="bg-[#141414] border border-zinc-800 rounded-2xl p-5 shadow-xl">
+                <div class="flex items-center gap-2 mb-4 border-b border-zinc-800 pb-3">
+                    <span class="text-xl">📤</span>
+                    <h2 class="text-lg font-black text-white">صرف كمية من منتج (آلية FIFO)</h2>
+                </div>
+                
+                <form id="outboundForm" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-400 mb-1.5">اختيار المنتج المراد سحبه</label>
+                        <select id="outboundProductSelect" required 
+                                class="w-full bg-[#1c1c1c] border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#BD1A22] transition-colors font-medium">
+                            <option value="">-- اختر المنتج من القائمة --</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-400 mb-1.5">إجمالي الكمية المطلوبة للمطبخ</label>
+                        <input type="number" id="quantityOut" required placeholder="أدخل الكمية المطلوبة" min="1" 
+                               class="w-full bg-[#1c1c1c] border border-zinc-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#BD1A22] transition-colors font-bold">
+                        <p class="text-[11px] text-zinc-500 mt-2">💡 سيقوم النظام تلقائياً بخصم الكميات من الشحنات الأقدم تاريخاً أولاً.</p>
+                    </div>
+                    <button type="submit" class="w-full bg-zinc-100 hover:bg-white text-black font-black py-3 px-4 rounded-xl transition-all duration-200 flex items-center justify-center gap-2 text-sm shadow-md">
+                        تنفيذ الصرف الذكي ⚡
+                    </button>
+                </form>
+            </div>
+
+        </section>
+
+        <!-- العمود الأيسر: لوحة الأرصدة الحالية (7 أعمدة) -->
+        <section class="lg:col-span-7">
+            <div class="bg-[#141414] border border-zinc-800 rounded-2xl shadow-xl h-full flex flex-col overflow-hidden">
+                
+                <div class="p-5 border-b border-zinc-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-[#181818]">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-xl">📊</span>
+                            <h2 class="text-lg font-black text-white">الأرصدة الحالية في المخزن (مزامنة حية)</h2>
+                        </div>
+                        <p class="text-xs text-gray-400 mt-0.5">مرتبة تلقائياً بناءً على تاريخ انتهاء الصلاحية الأقرب</p>
+                    </div>
+                </div>
+
+                <!-- جدول عرض شحنات المخزن -->
+                <div class="overflow-x-auto flex-grow">
+                    <table class="w-full text-right text-sm">
+                        <thead class="bg-[#1a1a1a] text-zinc-400 text-xs uppercase font-bold border-b border-zinc-800">
+                            <tr>
+                                <th class="px-4 py-3.5">اسم المنتج</th>
+                                <th class="px-4 py-3.5 text-center">الكمية المتاحة</th>
+                                <th class="px-4 py-3.5 text-center">تاريخ الانتهاء</th>
+                                <th class="px-4 py-3.5 text-center">الأيام المتبقية</th>
+                                <th class="px-4 py-3.5 text-center">وضع الصلاحية</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inventoryTableBody" class="divide-y divide-zinc-800 font-medium">
+                            <!-- يتم توليد الصفوف ديناميكياً بواسطة جافا سكريبت الخاصة بك -->
+                            <tr id="loadingRow">
+                                <td colspan="5" class="px-4 py-8 text-center text-zinc-500 font-bold">
+                                    جاري تحميل بيانات المخزن السحابي...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+            </div>
+        </section>
+
+    </main>
+
+    <!-- أسفل الصفحة (Footer) -->
+    <footer class="bg-[#141414] border-t border-zinc-800 text-center py-4 text-xs text-zinc-500 font-medium">
+        <p>© 2026 نظام إدارة FIFO السحابي - مخصص لصالح فروع بافلو برجر</p>
+    </footer>
+
+    <!-- ادراج ملفات Firebase و الجافا سكريبت الخاصة بك بالأسفل هنا -->
+    <!-- تأكد من نقل كود الـ JavaScript الخاص بك أو تركه كما هو مفعّل بمشروعك ليرتبط بالـ IDs المذكورة أعلاه -->
+
+</body>
+</html>
             <!-- مؤشر حالة الاتصال بالسحاب -->
             <div class="flex items-center gap-2 bg-[#1a1a1a] px-4 py-2 rounded-full border border-zinc-800">
                 <span class="relative flex h-3 w-3">
