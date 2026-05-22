@@ -35,7 +35,7 @@
         .stat-card h4 { margin: 0; color: #747d8c; font-size: 14px; text-transform: uppercase; }
         .stat-card .value { font-size: 26px; font-weight: bold; margin-top: 10px; color: var(--primary); }
 
-        .grid-forms { display: grid; grid-template-columns: repeat(auto-fit, minmax(450px, 1fr)); gap: 25px; margin-bottom: 25px; }
+        .grid-forms { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 25px; margin-bottom: 25px; }
         .card { background: white; padding: 25px; border-radius: 16px; box-shadow: var(--card-shadow); border: 1px solid rgba(0,0,0,0.02); }
         .card h3 { margin-top: 0; color: var(--primary); border-bottom: 2px solid #f1f2f6; padding-bottom: 12px; font-size: 19px; display: flex; align-items: center; gap: 10px; font-weight: 700; }
         
@@ -51,12 +51,18 @@
         .btn-add:hover { background-color: var(--accent-hover); }
         .btn-out { background-color: var(--primary); }
         .btn-out:hover { background-color: #2f3542; }
+        .btn-return { background-color: var(--warning); color: #fff; }
+        .btn-return:hover { background-color: #e69500; }
+        .btn-excel { background-color: #107c41; width: auto; padding: 10px 20px; font-size: 13px; display: flex; align-items: center; gap: 8px; }
+        .btn-excel:hover { background-color: #0b592e; }
+        .btn-delete { background-color: var(--danger); color: white; padding: 6px 12px; font-size: 12px; border-radius: 6px; width: auto; }
+        .btn-delete:hover { background-color: #ff2a3a; }
         button:disabled { background-color: #ced6e0 !important; color: #a4b0be !important; cursor: not-allowed; }
         
         /* أدوات الفلترة والبحث */
         .table-toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; margin-bottom: 15px; }
         .search-box { max-width: 350px; flex: 1; }
-        .filter-buttons { display: flex; gap: 8px; flex-wrap: wrap; }
+        .filter-buttons { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
         .filter-btn { padding: 8px 14px; font-size: 12px; border-radius: 20px; border: 1px solid #ced6e0; background: white; cursor: pointer; font-weight: 600; color: #57606f; width: auto; }
         .filter-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
 
@@ -116,15 +122,15 @@
             <form id="productForm" class="form-group">
                 <div>
                     <label>اسم الصنف / المادة الخام:</label>
-                    <input type="text" id="prodName" required placeholder="مثال: برجر لحم 150 جرام، صوص بافلو، خبز كايزر">
+                    <input type="text" id="prodName" required placeholder="مثال: برجر لحم 150 جرام، صوص بافلو">
                 </div>
                 <div class="form-row">
                     <div>
-                        <label>الكمية الواردة (عدد/كجم):</label>
+                        <label>الكمية الواردة:</label>
                         <input type="number" id="prodQty" min="1" required placeholder="0">
                     </div>
                     <div>
-                        <label>تاريخ انتهاء الصلاحية (Expiry):</label>
+                        <label>تاريخ انتهاء الصلاحية:</label>
                         <input type="date" id="prodExpiry" required>
                     </div>
                 </div>
@@ -133,19 +139,22 @@
         </div>
 
         <div class="card">
-            <h3>📤 أمر صرف وتشغيل (آلية FIFO)</h3>
+            <h3>📤 حركات المخزن (صرف / إرجاع)</h3>
             <form id="dispatchForm" class="form-group">
                 <div>
-                    <label>اختر الصنف المراد سحبه للمطبخ:</label>
+                    <label>اختر الصنف المستهدف:</label>
                     <select id="dispatchName" required>
                         <option value="">-- جاري تحميل القائمة المتاحة... --</option>
                     </select>
                 </div>
                 <div>
-                    <label>إجمالي الكمية المطلوبة للخروج:</label>
-                    <input type="number" id="dispatchQty" min="1" required placeholder="أدخل الكمية المطلوبة">
+                    <label>إجمالي الكمية المطلوبة (للصرف أو الإرجاع):</label>
+                    <input type="number" id="dispatchQty" min="1" required placeholder="أدخل الكمية">
                 </div>
-                <button type="submit" id="btnOutSubmit" class="btn-out">تنفيذ سحب الأرصدة الأقدم فوراً 🚀</button>
+                <div class="form-row">
+                    <button type="button" id="btnOutSubmit" onclick="handleDispatch('out')" class="btn-out">تنفيذ سحب FIFO 🚀</button>
+                    <button type="button" id="btnReturnSubmit" onclick="handleDispatch('return')" class="btn-return">إرجاع للمخزن (LIFO) ↩️</button>
+                </div>
             </form>
         </div>
     </div>
@@ -160,6 +169,7 @@
                 <button class="filter-btn" id="filterFifo" onclick="setFilter('fifo')">الأولوية الأولى (FIFO)</button>
                 <button class="filter-btn" id="filterWarning" onclick="setFilter('warning')">المقترب انتهاؤه ⚠️</button>
                 <button class="filter-btn" id="filterExpired" onclick="setFilter('expired')">المنتهي ❌</button>
+                <button class="btn-excel" id="btnExportExcel" onclick="exportToExcel()">تصدير إلى Excel 📊</button>
             </div>
         </div>
 
@@ -173,6 +183,7 @@
                         <th>تاريخ انتهاء الصلاحية</th>
                         <th>الأيام المتبقية</th>
                         <th>حالة الصلاحية</th>
+                        <th>إجراءات</th>
                     </tr>
                 </thead>
                 <tbody id="productTableBody"></tbody>
@@ -191,14 +202,18 @@
     const loadingDiv = document.getElementById('loading');
     const btnAddSubmit = document.getElementById('btnAddSubmit');
     const btnOutSubmit = document.getElementById('btnOutSubmit');
+    const btnReturnSubmit = document.getElementById('btnReturnSubmit');
+    const btnExportExcel = document.getElementById('btnExportExcel');
     
     let products = [];
-    let currentFilter = 'all'; // all, fifo, warning, expired
+    let currentFilter = 'all'; 
 
     function toggleControls(isLoading) {
         loadingDiv.style.display = isLoading ? 'block' : 'none';
         btnAddSubmit.disabled = isLoading;
         btnOutSubmit.disabled = isLoading;
+        btnReturnSubmit.disabled = isLoading;
+        btnExportExcel.disabled = isLoading;
     }
 
     function setFilter(filterType) {
@@ -208,7 +223,6 @@
         renderTable();
     }
 
-    // 1. جلب البيانات من جوجل شيت وفرزها بالـ FIFO
     async function fetchProducts() {
         toggleControls(true);
         try {
@@ -225,7 +239,6 @@
         toggleControls(false);
     }
 
-    // 2. حساب مؤشرات لوحة التحكم السريعة
     function calculateDashboardStats() {
         const uniqueItems = [...new Set(products.map(p => p.name))].length;
         const totalQty = products.reduce((sum, p) => sum + p.qty, 0);
@@ -247,7 +260,6 @@
         document.getElementById('statExpiredItems').textContent = expiredCount;
     }
 
-    // 3. مزامنة وإرسال الأرصدة المحدثة كاملة إلى جوجل شيت
     async function syncWithCloud() {
         toggleControls(true);
         try {
@@ -267,7 +279,6 @@
         }
     }
 
-    // حساب وضع الصلاحية
     function getExpiryStatus(expiryDateStr) {
         const today = new Date(); today.setHours(0,0,0,0);
         const expiryDate = new Date(expiryDateStr); expiryDate.setHours(0,0,0,0);
@@ -278,32 +289,26 @@
         return { daysLeft, badge: '<span class="badge badge-success">آمن وصالح ✅</span>' };
     }
 
-    // تحديث القائمة المنسدلة للصرف
     function updateSelectOptions() {
         const distinctNames = [...new Set(products.map(p => p.name))];
-        dispatchNameSelect.innerHTML = '<option value="">-- اختر الصنف المراد صرفه --</option>';
+        dispatchNameSelect.innerHTML = '<option value="">-- اختر الصنف --</option>';
         distinctNames.forEach(name => {
             const totalQty = products.filter(p => p.name === name).reduce((sum, p) => sum + p.qty, 0);
-            if(totalQty > 0) {
-                const option = document.createElement('option');
-                option.value = name;
-                option.textContent = `${name} (إجمالي المتاح: ${totalQty})`;
-                dispatchNameSelect.appendChild(option);
-            }
+            const option = document.createElement('option');
+            option.value = name;
+            option.textContent = `${name} (إجمالي المتاح: ${totalQty})`;
+            dispatchNameSelect.appendChild(option);
         });
     }
 
-    // بناء الجدول للمخدم المطور
     function renderTable() {
         productTableBody.innerHTML = '';
         const searchQuery = document.getElementById('tableSearch').value.toLowerCase().trim();
         const trackedFirst = {};
         let visibleRows = 0;
 
-        products.forEach((product) => {
+        products.forEach((product, originalIndex) => {
             if (product.qty <= 0) return;
-            
-            // فلترة البحث النصي
             if (searchQuery && !product.name.toLowerCase().includes(searchQuery)) return;
 
             const { daysLeft, badge } = getExpiryStatus(product.expiry);
@@ -319,7 +324,6 @@
                 fifoLabel = 'صرف أولاً (FIFO) 🚨';
             }
 
-            // تصفية الفلاتر المتقدمة (Toolbar Filters)
             if (currentFilter === 'fifo' && !isFirstForThisName) return;
             if (currentFilter === 'warning' && (daysLeft < 0 || daysLeft > 15)) return;
             if (currentFilter === 'expired' && daysLeft >= 0) return;
@@ -335,16 +339,16 @@
                 <td>${product.expiry}</td>
                 <td>${daysLeft < 0 ? `منتهي` : `${daysLeft} يوم`}</td>
                 <td>${badge}</td>
+                <td><button class="btn-delete" onclick="deleteBatch(${originalIndex})">حذف 🗑️</button></td>
             `;
             productTableBody.appendChild(row);
         });
 
         if (visibleRows === 0) {
-            productTableBody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#747d8c; padding: 30px;">لا توجد أصناف تطابق معايير الفلترة أو البحث الحالية.</td></tr>`;
+            productTableBody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:#747d8c; padding: 30px;">لا توجد أصناف تطابق معايير الفلترة أو البحث الحالية.</td></tr>`;
         }
     }
 
-    // إضافة منتج جديد
     productForm.addEventListener('submit', async function(e) {
         e.preventDefault();
         const name = document.getElementById('prodName').value.trim();
@@ -356,38 +360,124 @@
         await syncWithCloud();
     });
 
-    // سحب الكميات بنظام FIFO الذكي
-    dispatchForm.addEventListener('submit', async function(e) {
-        e.preventDefault();
+    async function handleDispatch(actionType) {
         const targetName = dispatchNameSelect.value;
         let requestedQty = parseInt(document.getElementById('dispatchQty').value);
 
-        const totalAvailable = products.filter(p => p.name === targetName).reduce((sum, p) => sum + p.qty, 0);
-
-        if (requestedQty > totalAvailable) {
-            alert(`الكمية غير كافية بالمخزن السحابي! المتاح فقط هو: ${totalAvailable}`);
+        if (!targetName || isNaN(requestedQty) || requestedQty <= 0) {
+            alert("يرجى اختيار الصنف وتحديد كمية صالحة.");
             return;
         }
 
-        for (let i = 0; i < products.length; i++) {
-            if (products[i].name === targetName && requestedQty > 0) {
-                if (products[i].qty >= requestedQty) {
-                    products[i].qty -= requestedQty;
-                    requestedQty = 0;
-                    break;
-                } else {
-                    requestedQty -= products[i].qty;
-                    products[i].qty = 0;
+        if (actionType === 'out') {
+            const totalAvailable = products.filter(p => p.name === targetName).reduce((sum, p) => sum + p.qty, 0);
+            if (requestedQty > totalAvailable) {
+                alert(`الكمية غير كافية بالمخزن! المتاح فقط هو: ${totalAvailable}`);
+                return;
+            }
+
+            for (let i = 0; i < products.length; i++) {
+                if (products[i].name === targetName && requestedQty > 0) {
+                    if (products[i].qty >= requestedQty) {
+                        products[i].qty -= requestedQty;
+                        requestedQty = 0;
+                        break;
+                    } else {
+                        requestedQty -= products[i].qty;
+                        products[i].qty = 0;
+                    }
                 }
+            }
+        } 
+        else if (actionType === 'return') {
+            let exactBatchFound = false;
+            for (let i = products.length - 1; i >= 0; i--) {
+                if (products[i].name === targetName) {
+                    products[i].qty += requestedQty;
+                    exactBatchFound = true;
+                    break;
+                }
+            }
+            if (!exactBatchFound) {
+                const returnExpiry = prompt(`لم يتم العثور على شحنة نشطة لهذا الصنف. يرجى إدخال تاريخ انتهاء الصلاحية للمواد المرتجعة بصيغة (YYYY-MM-DD):`);
+                if (!returnExpiry) return;
+                products.push({ name: targetName, qty: requestedQty, expiry: returnExpiry });
             }
         }
 
         products = products.filter(p => p.qty > 0);
         dispatchForm.reset();
         await syncWithCloud();
-    });
+    }
 
-    // تحميل البيانات فور فتح الصفحة مباشرة
+    async function deleteBatch(index) {
+        if (confirm(`هل أنت متأكد من حذف هذه الشحنة لـ (${products[index].name}) من المخزن السحابي نهائياً؟`)) {
+            products.splice(index, 1);
+            await syncWithCloud();
+        }
+    }
+
+    // دالة التصدير الأصلية المعدلة (تعمل بالـ Vanilla JavaScript بالكامل وتدعم الـ RTL والعربية)
+    function exportToExcel() {
+        if (products.length === 0) {
+            alert("لا توجد بيانات لتصديرها!");
+            return;
+        }
+
+        // بناء ملف المكونات بنظام XML التابع للإكسيل لضمان التوافق وحل مشكلة تشوه اللغة العربية ورؤية اليمين لليسار
+        let xml = '<?xml version="1.0" encoding="utf-8"?>\n' +
+                  '<?mso-application progid="Excel.Sheet"?>\n' +
+                  '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"\n' +
+                  ' xmlns:o="urn:schemas-microsoft-com:office:navy"\n' +
+                  ' xmlns:x="urn:schemas-microsoft-com:office:excel"\n' +
+                  ' xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"\n' +
+                  ' xmlns:html="http://www.w3.org/TR/REC-html40">\n' +
+                  ' <Worksheet ss:Name="مخزون بافلو برجر">\n' +
+                  '  <Table>\n' +
+                  '   <Row ss:Index="1">\n' +
+                  '    <Cell><Data ss:Type="String">اسم المادة الخام / الصنف</Data></Cell>\n' +
+                  '    <Cell><Data ss:Type="String">الكمية المتاحة بالرصيد</Data></Cell>\n' +
+                  '    <Cell><Data ss:Type="String">تاريخ انتهاء الصلاحية</Data></Cell>\n' +
+                  '    <Cell><Data ss:Type="String">الأيام المتبقية</Data></Cell>\n' +
+                  '    <Cell><Data ss:Type="String">حالة جودة الصلاحية</Data></Cell>\n' +
+                  '   </Row>\n';
+
+        products.forEach(p => {
+            const today = new Date(); today.setHours(0,0,0,0);
+            const expiryDate = new Date(p.expiry); expiryDate.setHours(0,0,0,0);
+            const daysLeft = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
+            
+            let statusStr = "آمن وصالح";
+            if (daysLeft < 0) statusStr = "منتهي الصلاحية";
+            else if (daysLeft <= 15) statusStr = "استهلاك سريع (خطر)";
+
+            xml += '   <Row>\n' +
+                   `    <Cell><Data ss:Type="String">${p.name}</Data></Cell>\n` +
+                   `    <Cell><Data ss:Type="Number">${p.qty}</Data></Cell>\n` +
+                   `    <Cell><Data ss:Type="String">${p.expiry}</Data></Cell>\n` +
+                   `    <Cell><Data ss:Type="String">${daysLeft < 0 ? "منتهي" : daysLeft + " يوم"}</Data></Cell>\n` +
+                   `    <Cell><Data ss:Type="String">${statusStr}</Data></Cell>\n` +
+                   '   </Row>\n';
+        });
+
+        xml += '  </Table>\n' +
+               '  <WorksheetOptions xmlns="urn:schemas-microsoft-com:office:excel">\n' +
+               '   <DisplayRightToLeft/>\n' + // تفعيل الاتجاه العربي تلقائياً بالإكسيل
+               '  </WorksheetOptions>\n' +
+               ' </Worksheet>\n' +
+               '</Workbook>';
+
+        // تحويل النص إلى بيانات تتيح تحميلها كملف
+        const blob = new Blob([xml], { type: "application/vnd.ms-excel;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = `Buffalo_Burger_Inventory_${new Date().toISOString().slice(0,10)}.xls`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    }
+
     fetchProducts();
 </script>
 </body>
