@@ -85,6 +85,8 @@
         .fifo-next { border-right: 4px solid #ced6e0; }
 
         #loading { text-align: center; font-weight: bold; color: #b7791f; display: none; margin-bottom: 25px; background: #fffaf0; padding: 15px; border-radius: 12px; border: 1px solid #fbd38d; box-shadow: var(--card-shadow); font-size: 15px; }
+        
+        .item-code-text { color: #888; font-size: 11px; display: block; font-weight: normal; margin-top: 2px; }
     </style>
 </head>
 <body>
@@ -120,9 +122,15 @@
         <div class="card">
             <h3>📥 توريد شحنة خامات جديدة</h3>
             <form id="productForm" class="form-group">
-                <div>
-                    <label>اسم الصنف / المادة الخام:</label>
-                    <input type="text" id="prodName" required placeholder="مثال: برجر لحم 150 جرام، صوص بافلو">
+                <div class="form-row">
+                    <div>
+                        <label>كود الصنف (SKU / Code):</label>
+                        <input type="text" id="prodCode" required placeholder="مثال: BUF-01">
+                    </div>
+                    <div>
+                        <label>اسم الصنف / المادة الخام:</label>
+                        <input type="text" id="prodName" required placeholder="مثال: برجر لحم 150 جرام">
+                    </div>
                 </div>
                 <div class="form-row">
                     <div>
@@ -162,7 +170,7 @@
     <div class="card">
         <div class="table-toolbar">
             <div class="search-box">
-                <input type="text" id="tableSearch" placeholder="🔍 بحث سريع عن صنف بالمخزن..." oninput="renderTable()">
+                <input type="text" id="tableSearch" placeholder="🔍 بحث سريع باسم أو كود الصنف..." oninput="renderTable()">
             </div>
             <div class="filter-buttons">
                 <button class="filter-btn active" id="filterAll" onclick="setFilter('all')">الكل</button>
@@ -178,6 +186,7 @@
                 <thead>
                     <tr>
                         <th>أولوية السحب</th>
+                        <th>كود الصنف</th>
                         <th>اسم الصنف</th>
                         <th>الكمية المتاحة</th>
                         <th>تاريخ انتهاء الصلاحية</th>
@@ -293,10 +302,12 @@
         const distinctNames = [...new Set(products.map(p => p.name))];
         dispatchNameSelect.innerHTML = '<option value="">-- اختر الصنف --</option>';
         distinctNames.forEach(name => {
+            const relatedProduct = products.find(p => p.name === name);
+            const itemCode = relatedProduct && relatedProduct.code ? relatedProduct.code : 'بدون كود';
             const totalQty = products.filter(p => p.name === name).reduce((sum, p) => sum + p.qty, 0);
             const option = document.createElement('option');
             option.value = name;
-            option.textContent = `${name} (إجمالي المتاح: ${totalQty})`;
+            option.textContent = `[${itemCode}] ${name} (إجمالي المتاح: ${totalQty})`;
             dispatchNameSelect.appendChild(option);
         });
     }
@@ -309,7 +320,9 @@
 
         products.forEach((product, originalIndex) => {
             if (product.qty <= 0) return;
-            if (searchQuery && !product.name.toLowerCase().includes(searchQuery)) return;
+            
+            const itemCode = product.code || '';
+            if (searchQuery && !product.name.toLowerCase().includes(searchQuery) && !itemCode.toLowerCase().includes(searchQuery)) return;
 
             const { daysLeft, badge } = getExpiryStatus(product.expiry);
             
@@ -334,6 +347,7 @@
 
             row.innerHTML = `
                 <td><span class="badge-fifo">${fifoLabel}</span></td>
+                <td><span class="badge" style="background:#57606f; font-family:monospace; font-size:12px;">${itemCode || '---'}</span></td>
                 <td><b>${product.name}</b></td>
                 <td><b>${product.qty}</b></td>
                 <td>${product.expiry}</td>
@@ -345,17 +359,18 @@
         });
 
         if (visibleRows === 0) {
-            productTableBody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:#747d8c; padding: 30px;">لا توجد أصناف تطابق معايير الفلترة أو البحث الحالية.</td></tr>`;
+            productTableBody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:#747d8c; padding: 30px;">لا توجد أصناف تطابق معايير الفلترة أو البحث الحالية.</td></tr>`;
         }
     }
 
     productForm.addEventListener('submit', async function(e) {
         e.preventDefault();
+        const code = document.getElementById('prodCode').value.trim();
         const name = document.getElementById('prodName').value.trim();
         const qty = parseInt(document.getElementById('prodQty').value);
         const expiry = document.getElementById('prodExpiry').value;
 
-        products.push({ name, qty, expiry });
+        products.push({ code, name, qty, expiry });
         productForm.reset();
         await syncWithCloud();
     });
@@ -380,7 +395,7 @@
                 if (products[i].name === targetName && requestedQty > 0) {
                     if (products[i].qty >= requestedQty) {
                         products[i].qty -= requestedQty;
-                        requestedQty = 0;
+                        requiredQty = 0;
                         break;
                     } else {
                         requestedQty -= products[i].qty;
@@ -401,7 +416,12 @@
             if (!exactBatchFound) {
                 const returnExpiry = prompt(`لم يتم العثور على شحنة نشطة لهذا الصنف. يرجى إدخال تاريخ انتهاء الصلاحية للمواد المرتجعة بصيغة (YYYY-MM-DD):`);
                 if (!returnExpiry) return;
-                products.push({ name: targetName, qty: requestedQty, expiry: returnExpiry });
+                
+                // البحث عن الكود القديم إن وُجد لتثبيته في المرتجع الجديد
+                const existingProd = products.find(p => p.name === targetName);
+                const returnCode = existingProd ? existingProd.code : '';
+                
+                products.push({ code: returnCode, name: targetName, qty: requestedQty, expiry: returnExpiry });
             }
         }
 
@@ -417,14 +437,12 @@
         }
     }
 
-    // دالة التصدير الأصلية المعدلة (تعمل بالـ Vanilla JavaScript بالكامل وتدعم الـ RTL والعربية)
     function exportToExcel() {
         if (products.length === 0) {
             alert("لا توجد بيانات لتصديرها!");
             return;
         }
 
-        // بناء ملف المكونات بنظام XML التابع للإكسيل لضمان التوافق وحل مشكلة تشوه اللغة العربية ورؤية اليمين لليسار
         let xml = '<?xml version="1.0" encoding="utf-8"?>\n' +
                   '<?mso-application progid="Excel.Sheet"?>\n' +
                   '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"\n' +
@@ -435,6 +453,7 @@
                   ' <Worksheet ss:Name="مخزون بافلو برجر">\n' +
                   '  <Table>\n' +
                   '   <Row ss:Index="1">\n' +
+                  '    <Cell><Data ss:Type="String">كود الصنف</Data></Cell>\n' +
                   '    <Cell><Data ss:Type="String">اسم المادة الخام / الصنف</Data></Cell>\n' +
                   '    <Cell><Data ss:Type="String">الكمية المتاحة بالرصيد</Data></Cell>\n' +
                   '    <Cell><Data ss:Type="String">تاريخ انتهاء الصلاحية</Data></Cell>\n' +
@@ -452,6 +471,7 @@
             else if (daysLeft <= 15) statusStr = "استهلاك سريع (خطر)";
 
             xml += '   <Row>\n' +
+                   `    <Cell><Data ss:Type="String">${p.code || ''}</Data></Cell>\n` +
                    `    <Cell><Data ss:Type="String">${p.name}</Data></Cell>\n` +
                    `    <Cell><Data ss:Type="Number">${p.qty}</Data></Cell>\n` +
                    `    <Cell><Data ss:Type="String">${p.expiry}</Data></Cell>\n` +
@@ -462,12 +482,11 @@
 
         xml += '  </Table>\n' +
                '  <WorksheetOptions xmlns="urn:schemas-microsoft-com:office:excel">\n' +
-               '   <DisplayRightToLeft/>\n' + // تفعيل الاتجاه العربي تلقائياً بالإكسيل
+               '   <DisplayRightToLeft/>\n' + 
                '  </WorksheetOptions>\n' +
                ' </Worksheet>\n' +
                '</Workbook>';
 
-        // تحويل النص إلى بيانات تتيح تحميلها كملف
         const blob = new Blob([xml], { type: "application/vnd.ms-excel;charset=utf-8;" });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
