@@ -85,8 +85,6 @@
         .fifo-next { border-right: 4px solid #ced6e0; }
 
         #loading { text-align: center; font-weight: bold; color: #b7791f; display: none; margin-bottom: 25px; background: #fffaf0; padding: 15px; border-radius: 12px; border: 1px solid #fbd38d; box-shadow: var(--card-shadow); font-size: 15px; }
-        
-        .item-code-text { color: #888; font-size: 11px; display: block; font-weight: normal; margin-top: 2px; }
     </style>
 </head>
 <body>
@@ -124,12 +122,12 @@
             <form id="productForm" class="form-group">
                 <div class="form-row">
                     <div>
-                        <label>كود الصنف (SKU / Code):</label>
-                        <input type="text" id="prodCode" required placeholder="مثال: BUF-01">
+                        <label>كود الصنف (SKU):</label>
+                        <input type="text" id="prodCode" required placeholder="مثال: BUF-101">
                     </div>
                     <div>
                         <label>اسم الصنف / المادة الخام:</label>
-                        <input type="text" id="prodName" required placeholder="مثال: برجر لحم 150 جرام">
+                        <input type="text" id="prodName" required placeholder="مثال: برجر لحم 150 جرام، صوص بافلو">
                     </div>
                 </div>
                 <div class="form-row">
@@ -192,7 +190,7 @@
                         <th>تاريخ انتهاء الصلاحية</th>
                         <th>الأيام المتبقية</th>
                         <th>حالة الصلاحية</th>
-                        <th>إجراءات</th>
+                        <th>إجراءات الإعدام</th>
                     </tr>
                 </thead>
                 <tbody id="productTableBody"></tbody>
@@ -202,6 +200,7 @@
 </div>
 
 <script {nonce}>
+    // الرابط المباشر الخاص بك والمطابق لإعدادات النشر المفتوحة (Anyone)
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxqZIxMOQjQY8ri2EdxEBUZcKvKulVEUP8D8SxUrBkiBJxsAMFP4E7su0w-m7az1i8R/exec";
 
     const productForm = document.getElementById('productForm');
@@ -216,6 +215,21 @@
     
     let products = [];
     let currentFilter = 'all'; 
+
+    // دالة اختصار وتوحيد صيغة التاريخ تلقائياً إلى YYYY-MM-DD لمنع ظهور النصوص الطويلة
+    function formatDateShort(dateInput) {
+        if (!dateInput) return '';
+        try {
+            const d = new Date(dateInput);
+            if (isNaN(d.getTime())) return dateInput.toString().slice(0, 10);
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        } catch (e) {
+            return dateInput;
+        }
+    }
 
     function toggleControls(isLoading) {
         loadingDiv.style.display = isLoading ? 'block' : 'none';
@@ -236,14 +250,23 @@
         toggleControls(true);
         try {
             const response = await fetch(SCRIPT_URL);
-            products = await response.json();
+            const rawData = await response.json();
+            
+            // قراءة وتنسيق البيانات لضمان توافق "كود الصنف" واختصار التواريخ الطويلة
+            products = rawData.map(item => ({
+                code: item.code || '',
+                name: item.name,
+                qty: parseInt(item.qty) || 0,
+                expiry: formatDateShort(item.expiry)
+            }));
+
             products.sort((a, b) => new Date(a.expiry) - new Date(b.expiry));
             calculateDashboardStats();
             renderTable();
             updateSelectOptions();
         } catch (error) { 
             console.error(error);
-            alert("خطأ في جلب البيانات السحابية، تأكد من اتصال الإنترنت.");
+            alert("خطأ في جلب البيانات السحابية، تأكد من اتصال الإنترنت وتحديث صلاحيات السكربت.");
         }
         toggleControls(false);
     }
@@ -271,6 +294,15 @@
 
     async function syncWithCloud() {
         toggleControls(true);
+        
+        // تنظيف البيانات واختصار التواريخ محلياً قبل تصديرها للسيرفر مجدداً
+        products = products.map(p => ({
+            code: p.code || '',
+            name: p.name,
+            qty: parseInt(p.qty) || 0,
+            expiry: formatDateShort(p.expiry)
+        }));
+
         try {
             await fetch(SCRIPT_URL, {
                 method: 'POST',
@@ -302,12 +334,12 @@
         const distinctNames = [...new Set(products.map(p => p.name))];
         dispatchNameSelect.innerHTML = '<option value="">-- اختر الصنف --</option>';
         distinctNames.forEach(name => {
-            const relatedProduct = products.find(p => p.name === name);
-            const itemCode = relatedProduct && relatedProduct.code ? relatedProduct.code : 'بدون كود';
+            const related = products.find(p => p.name === name);
+            const codePrefix = related && related.code ? `[${related.code}] ` : '';
             const totalQty = products.filter(p => p.name === name).reduce((sum, p) => sum + p.qty, 0);
             const option = document.createElement('option');
             option.value = name;
-            option.textContent = `[${itemCode}] ${name} (إجمالي المتاح: ${totalQty})`;
+            option.textContent = `${codePrefix}${name} (إجمالي المتاح: ${totalQty})`;
             dispatchNameSelect.appendChild(option);
         });
     }
@@ -350,7 +382,7 @@
                 <td><span class="badge" style="background:#57606f; font-family:monospace; font-size:12px;">${itemCode || '---'}</span></td>
                 <td><b>${product.name}</b></td>
                 <td><b>${product.qty}</b></td>
-                <td>${product.expiry}</td>
+                <td>${formatDateShort(product.expiry)}</td>
                 <td>${daysLeft < 0 ? `منتهي` : `${daysLeft} يوم`}</td>
                 <td>${badge}</td>
                 <td><button class="btn-delete" onclick="deleteBatch(${originalIndex})">حذف 🗑️</button></td>
@@ -368,7 +400,7 @@
         const code = document.getElementById('prodCode').value.trim();
         const name = document.getElementById('prodName').value.trim();
         const qty = parseInt(document.getElementById('prodQty').value);
-        const expiry = document.getElementById('prodExpiry').value;
+        const expiry = formatDateShort(document.getElementById('prodExpiry').value);
 
         products.push({ code, name, qty, expiry });
         productForm.reset();
@@ -395,7 +427,7 @@
                 if (products[i].name === targetName && requestedQty > 0) {
                     if (products[i].qty >= requestedQty) {
                         products[i].qty -= requestedQty;
-                        requiredQty = 0;
+                        requestedQty = 0;
                         break;
                     } else {
                         requestedQty -= products[i].qty;
@@ -414,10 +446,10 @@
                 }
             }
             if (!exactBatchFound) {
-                const returnExpiry = prompt(`لم يتم العثور على شحنة نشطة لهذا الصنف. يرجى إدخال تاريخ انتهاء الصلاحية للمواد المرتجعة بصيغة (YYYY-MM-DD):`);
-                if (!returnExpiry) return;
+                const returnExpiryInput = prompt(`لم يتم العثور على شحنة نشطة لهذا الصنف. يرجى إدخال تاريخ انتهاء الصلاحية للمواد المرتجعة بصيغة (YYYY-MM-DD):`);
+                if (!returnExpiryInput) return;
                 
-                // البحث عن الكود القديم إن وُجد لتثبيته في المرتجع الجديد
+                const returnExpiry = formatDateShort(returnExpiryInput);
                 const existingProd = products.find(p => p.name === targetName);
                 const returnCode = existingProd ? existingProd.code : '';
                 
@@ -474,9 +506,9 @@
                    `    <Cell><Data ss:Type="String">${p.code || ''}</Data></Cell>\n` +
                    `    <Cell><Data ss:Type="String">${p.name}</Data></Cell>\n` +
                    `    <Cell><Data ss:Type="Number">${p.qty}</Data></Cell>\n` +
-                   `    <Cell><Data ss:Type="String">${p.expiry}</Data></Cell>\n` +
+                   `    <Cell><Data ss:Type="String">${formatDateShort(p.expiry)}</Data></Cell>\n` +
                    `    <Cell><Data ss:Type="String">${daysLeft < 0 ? "منتهي" : daysLeft + " يوم"}</Data></Cell>\n` +
-                   `    <Cell><Data ss:Type="String">${statusStr}</Data></Cell>\n` +
+                   `    <Cell><Data ss:Type="String">${statusStr}</Data></Cell>\n' +
                    '   </Row>\n';
         });
 
