@@ -127,7 +127,7 @@
                     </div>
                     <div>
                         <label>اسم الصنف / المادة الخام:</label>
-                        <input type="text" id="prodName" required placeholder="مثال: برجر لحم 150 جرام، صوص بافلو">
+                        <input type="text" id="prodName" required placeholder="مثال: برجر لحم 150 جرام">
                     </div>
                 </div>
                 <div class="form-row">
@@ -190,7 +190,7 @@
                         <th>تاريخ انتهاء الصلاحية</th>
                         <th>الأيام المتبقية</th>
                         <th>حالة الصلاحية</th>
-                        <th>إجراءات الإعدام</th>
+                        <th>إجراءات</th>
                     </tr>
                 </thead>
                 <tbody id="productTableBody"></tbody>
@@ -200,8 +200,7 @@
 </div>
 
 <script {nonce}>
-    // الرابط المباشر الخاص بك والمطابق لإعدادات النشر المفتوحة (Anyone)
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxqZIxMOQjQY8ri2EdxEBUZcKvKulVEUP8D8SxUrBkiBJxsAMFP4E7su0w-m7az1i8R/exec";
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxB0q513xEUodo-MhzyZyVl9SYGieTiuRkrmojwEyVJOWemlS5kqK1nkftc_aXUvDjgbw/exec";
 
     const productForm = document.getElementById('productForm');
     const dispatchForm = document.getElementById('dispatchForm');
@@ -216,16 +215,31 @@
     let products = [];
     let currentFilter = 'all'; 
 
-    // دالة اختصار وتوحيد صيغة التاريخ تلقائياً إلى YYYY-MM-DD لمنع ظهور النصوص الطويلة
+    // دالة المعالجة فائقة الأمان لتنظيف وتحويل التواريخ مهما اختلفت صيغتها القادمة من السيرفر
     function formatDateShort(dateInput) {
         if (!dateInput) return '';
         try {
+            let dateStr = dateInput.toString();
+            if (dateStr.includes('GMT') || dateStr.includes(' ') && isNaN(dateStr)) {
+                const parsedDate = new Date(dateStr);
+                if (!isNaN(parsedDate.getTime())) {
+                    const year = parsedDate.getFullYear();
+                    const month = String(parsedDate.getMonth() + 1).padStart(2, '0');
+                    const day = String(parsedDate.getDate()).padStart(2, '0');
+                    return `${year}-${month}-${day}`;
+                }
+            }
+            if (dateStr.includes('T')) {
+                return dateStr.split('T')[0];
+            }
             const d = new Date(dateInput);
-            if (isNaN(d.getTime())) return dateInput.toString().slice(0, 10);
-            const year = d.getFullYear();
-            const month = String(d.getMonth() + 1).padStart(2, '0');
-            const day = String(d.getDate()).padStart(2, '0');
-            return `${year}-${month}-${day}`;
+            if (!isNaN(d.getTime())) {
+                const year = d.getFullYear();
+                const month = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                return `${year}-${month}-${day}`;
+            }
+            return dateStr.slice(0, 10);
         } catch (e) {
             return dateInput;
         }
@@ -252,21 +266,36 @@
             const response = await fetch(SCRIPT_URL);
             const rawData = await response.json();
             
-            // قراءة وتنسيق البيانات لضمان توافق "كود الصنف" واختصار التواريخ الطويلة
-            products = rawData.map(item => ({
-                code: item.code || '',
-                name: item.name,
-                qty: parseInt(item.qty) || 0,
-                expiry: formatDateShort(item.expiry)
-            }));
+            if (Array.isArray(rawData)) {
+                products = rawData.map(item => {
+                    let code = item.code || item.sku || item[0] || '';
+                    let name = item.name || item[1] || 'صنف غير معرف';
+                    let qty = parseInt(item.qty || item[2]) || 0;
+                    let expiry = item.expiry || item[3] || '';
+                    
+                    // إذا كان السيرفر يعيد ترتيب مغاير، نقوم بتبديل مرن لضمان قراءة الاسم والكمية
+                    if(typeof code === 'string' && !isNaN(name)) {
+                        let temp = name; name = code; code = temp;
+                    }
+
+                    return {
+                        code: code.toString().trim(),
+                        name: name.toString().trim(),
+                        qty: qty,
+                        expiry: formatDateShort(expiry)
+                    };
+                }).filter(p => p.qty > 0);
+            } else {
+                products = [];
+            }
 
             products.sort((a, b) => new Date(a.expiry) - new Date(b.expiry));
             calculateDashboardStats();
             renderTable();
             updateSelectOptions();
         } catch (error) { 
-            console.error(error);
-            alert("خطأ في جلب البيانات السحابية، تأكد من اتصال الإنترنت وتحديث صلاحيات السكربت.");
+            console.error("Fetch Error: ", error);
+            alert("خطأ في الاتصال بالخادم، سيتم عرض المحتوى المحلي إن وجد.");
         }
         toggleControls(false);
     }
@@ -295,13 +324,12 @@
     async function syncWithCloud() {
         toggleControls(true);
         
-        // تنظيف البيانات واختصار التواريخ محلياً قبل تصديرها للسيرفر مجدداً
         products = products.map(p => ({
-            code: p.code || '',
-            name: p.name,
+            code: (p.code || '').toString().trim(),
+            name: p.name.toString().trim(),
             qty: parseInt(p.qty) || 0,
             expiry: formatDateShort(p.expiry)
-        }));
+        })).filter(p => p.qty > 0);
 
         try {
             await fetch(SCRIPT_URL, {
@@ -313,9 +341,9 @@
             renderTable();
             updateSelectOptions();
             
-            setTimeout(fetchProducts, 1000);
+            setTimeout(fetchProducts, 1200);
         } catch (error) {
-            alert("فشلت عملية المزامنة السحابية.");
+            alert("فشلت المزامنة السحابية، يرجى التحقق من اتصال الإنترنت.");
             toggleControls(false);
         }
     }
@@ -382,7 +410,7 @@
                 <td><span class="badge" style="background:#57606f; font-family:monospace; font-size:12px;">${itemCode || '---'}</span></td>
                 <td><b>${product.name}</b></td>
                 <td><b>${product.qty}</b></td>
-                <td>${formatDateShort(product.expiry)}</td>
+                <td>${product.expiry}</td>
                 <td>${daysLeft < 0 ? `منتهي` : `${daysLeft} يوم`}</td>
                 <td>${badge}</td>
                 <td><button class="btn-delete" onclick="deleteBatch(${originalIndex})">حذف 🗑️</button></td>
@@ -506,9 +534,9 @@
                    `    <Cell><Data ss:Type="String">${p.code || ''}</Data></Cell>\n` +
                    `    <Cell><Data ss:Type="String">${p.name}</Data></Cell>\n` +
                    `    <Cell><Data ss:Type="Number">${p.qty}</Data></Cell>\n` +
-                   `    <Cell><Data ss:Type="String">${formatDateShort(p.expiry)}</Data></Cell>\n` +
+                   `    <Cell><Data ss:Type="String">${p.expiry}</Data></Cell>\n` +
                    `    <Cell><Data ss:Type="String">${daysLeft < 0 ? "منتهي" : daysLeft + " يوم"}</Data></Cell>\n` +
-                   `    <Cell><Data ss:Type="String">${statusStr}</Data></Cell>\n' +
+                   `    <Cell><Data ss:Type="String">${statusStr}</Data></Cell>\n` +
                    '   </Row>\n';
         });
 
