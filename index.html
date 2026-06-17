@@ -41,6 +41,7 @@
         
         .form-group { display: flex; flex-direction: column; gap: 15px; }
         .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .form-triple { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
         
         input, select, button { width: 100%; padding: 13px; border-radius: 8px; border: 1px solid #ced6e0; box-sizing: border-box; font-size: 14px; font-family: inherit; transition: all 0.2s; }
         input:focus, select:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px rgba(231, 76, 60, 0.15); background-color: #fff; }
@@ -57,6 +58,8 @@
         .btn-excel:hover { background-color: #0b592e; }
         .btn-delete { background-color: var(--danger); color: white; padding: 6px 12px; font-size: 12px; border-radius: 6px; width: auto; }
         .btn-delete:hover { background-color: #ff2a3a; }
+        .btn-edit { background-color: #2ed573; color: white; padding: 6px 12px; font-size: 12px; border-radius: 6px; width: auto; margin-left: 5px; }
+        .btn-edit:hover { background-color: #26af5f; }
         button:disabled { background-color: #ced6e0 !important; color: #a4b0be !important; cursor: not-allowed; }
         
         /* أدوات الفلترة والبحث */
@@ -107,7 +110,7 @@
             <div class="value" id="statTotalQty">0</div>
         </div>
         <div class="stat-card warning-items">
-            <h4>شحنات أوشكت صلاحيتها</h4>
+            <h4>شحنات حرجة (أقل من 10% صلاحية)</h4>
             <div class="value" id="statWarningItems" style="color: var(--warning);">0</div>
         </div>
         <div class="stat-card danger-items">
@@ -123,17 +126,21 @@
                 <div class="form-row">
                     <div>
                         <label>كود الصنف (SKU):</label>
-                        <input type="text" id="prodCode" required placeholder="مثال: BUF-101">
+                        <input type="text" id="prodCode" required placeholder="مثال: BUF-101" oninput="autoFillNameByCode()">
                     </div>
                     <div>
                         <label>اسم الصنف / المادة الخام:</label>
                         <input type="text" id="prodName" required placeholder="مثال: برجر لحم 150 جرام">
                     </div>
                 </div>
-                <div class="form-row">
+                <div class="form-triple">
                     <div>
                         <label>الكمية الواردة:</label>
                         <input type="number" id="prodQty" min="1" required placeholder="0">
+                    </div>
+                    <div>
+                        <label>تاريخ الإنتاج:</label>
+                        <input type="date" id="prodProduction" required>
                     </div>
                     <div>
                         <label>تاريخ انتهاء الصلاحية:</label>
@@ -173,7 +180,7 @@
             <div class="filter-buttons">
                 <button class="filter-btn active" id="filterAll" onclick="setFilter('all')">الكل</button>
                 <button class="filter-btn" id="filterFifo" onclick="setFilter('fifo')">الأولوية الأولى (FIFO)</button>
-                <button class="filter-btn" id="filterWarning" onclick="setFilter('warning')">المقترب انتهاؤه ⚠️</button>
+                <button class="filter-btn" id="filterWarning" onclick="setFilter('warning')">المتبقي أقل من 10% ⚠️</button>
                 <button class="filter-btn" id="filterExpired" onclick="setFilter('expired')">المنتهي ❌</button>
                 <button class="btn-excel" id="btnExportExcel" onclick="exportToExcel()">تصدير إلى Excel 📊</button>
             </div>
@@ -187,7 +194,8 @@
                         <th>كود الصنف</th>
                         <th>اسم الصنف</th>
                         <th>الكمية المتاحة</th>
-                        <th>تاريخ انتهاء الصلاحية</th>
+                        <th>تاريخ الإنتاج</th>
+                        <th>تاريخ الانتهاء</th>
                         <th>الأيام المتبقية</th>
                         <th>حالة الصلاحية</th>
                         <th>إجراءات</th>
@@ -199,8 +207,9 @@
     </div>
 </div>
 
-<script {nonce}>
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxB0q513xEUodo-MhzyZyVl9SYGieTiuRkrmojwEyVJOWemlS5kqK1nkftc_aXUvDjgbw/exec";
+<script>
+    // ضع رابط الـ Apps Script المحدث الخاص بك هنا ليعمل الربط السحابي بشكل ممتاز
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwNaqCZC-2myLLB6iz868nhKPzIGDo5poRDQarmcCu-AWLghm-okKeS8A9bseFV8z53Tg/exec";
 
     const productForm = document.getElementById('productForm');
     const dispatchForm = document.getElementById('dispatchForm');
@@ -215,7 +224,6 @@
     let products = [];
     let currentFilter = 'all'; 
 
-    // دالة المعالجة فائقة الأمان لتنظيف وتحويل التواريخ مهما اختلفت صيغتها القادمة من السيرفر
     function formatDateShort(dateInput) {
         if (!dateInput) return '';
         try {
@@ -260,6 +268,18 @@
         renderTable();
     }
 
+    // ميزة 1: دالة جلب الاسم بمجرد إدخال الكود
+    function autoFillNameByCode() {
+        const inputCode = document.getElementById('prodCode').value.trim().toLowerCase();
+        if(!inputCode) return;
+        
+        // البحث في المنتجات المحملة عن صنف يحمل نفس الكود
+        const foundProduct = products.find(p => p.code.toLowerCase() === inputCode);
+        if(foundProduct) {
+            document.getElementById('prodName').value = foundProduct.name;
+        }
+    }
+
     async function fetchProducts() {
         toggleControls(true);
         try {
@@ -271,17 +291,19 @@
                     let code = item.code || item.sku || item[0] || '';
                     let name = item.name || item[1] || 'صنف غير معرف';
                     let qty = parseInt(item.qty || item[2]) || 0;
-                    let expiry = item.expiry || item[3] || '';
+                    let production = item.production || item[3] || '';
+                    let expiry = item.expiry || item[4] || '';
                     
-                    // إذا كان السيرفر يعيد ترتيب مغاير، نقوم بتبديل مرن لضمان قراءة الاسم والكمية
-                    if(typeof code === 'string' && !isNaN(name)) {
-                        let temp = name; name = code; code = temp;
+                    if (!expiry && production) {
+                        expiry = production;
+                        production = formatDateShort(new Date()); 
                     }
 
                     return {
                         code: code.toString().trim(),
                         name: name.toString().trim(),
                         qty: qty,
+                        production: formatDateShort(production),
                         expiry: formatDateShort(expiry)
                     };
                 }).filter(p => p.qty > 0);
@@ -308,11 +330,9 @@
         let expiredCount = 0;
         
         products.forEach(p => {
-            const today = new Date(); today.setHours(0,0,0,0);
-            const expiryDate = new Date(p.expiry); expiryDate.setHours(0,0,0,0);
-            const daysLeft = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
-            if (daysLeft < 0) expiredCount++;
-            else if (daysLeft <= 15) warningCount++;
+            const { isExpired, isWarning } = checkExpiryLogic(p.production, p.expiry);
+            if (isExpired) expiredCount++;
+            else if (isWarning) warningCount++;
         });
 
         document.getElementById('statUniqueItems').textContent = uniqueItems;
@@ -328,6 +348,7 @@
             code: (p.code || '').toString().trim(),
             name: p.name.toString().trim(),
             qty: parseInt(p.qty) || 0,
+            production: formatDateShort(p.production),
             expiry: formatDateShort(p.expiry)
         })).filter(p => p.qty > 0);
 
@@ -348,14 +369,27 @@
         }
     }
 
-    function getExpiryStatus(expiryDateStr) {
+    function checkExpiryLogic(prodDateStr, expDateStr) {
         const today = new Date(); today.setHours(0,0,0,0);
-        const expiryDate = new Date(expiryDateStr); expiryDate.setHours(0,0,0,0);
-        const daysLeft = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
+        const prodDate = new Date(prodDateStr); prodDate.setHours(0,0,0,0);
+        const expDate = new Date(expDateStr); expDate.setHours(0,0,0,0);
         
-        if (daysLeft < 0) return { daysLeft, badge: '<span class="badge badge-danger">منتهي الصلاحية ❌</span>' };
-        if (daysLeft <= 15) return { daysLeft, badge: '<span class="badge badge-warning">استهلاك سريع ⚠️</span>' };
-        return { daysLeft, badge: '<span class="badge badge-success">آمن وصالح ✅</span>' };
+        const totalLifetimeMs = expDate - prodDate;
+        const remainingLifetimeMs = expDate - today;
+        
+        const daysLeft = Math.ceil(remainingLifetimeMs / (1000 * 60 * 60 * 24));
+        
+        if (daysLeft < 0) {
+            return { daysLeft, isExpired: true, isWarning: false, badge: '<span class="badge badge-danger">منتهي الصلاحية ❌</span>' };
+        }
+        
+        const warningThresholdMs = totalLifetimeMs * 0.10;
+        
+        if (remainingLifetimeMs <= warningThresholdMs) {
+            return { daysLeft, isExpired: false, isWarning: true, badge: '<span class="badge badge-warning">حرِج (أقل من 10%) ⚠️</span>' };
+        }
+        
+        return { daysLeft, isExpired: false, isWarning: false, badge: '<span class="badge badge-success">آمن وصالح ✅</span>' };
     }
 
     function updateSelectOptions() {
@@ -384,7 +418,7 @@
             const itemCode = product.code || '';
             if (searchQuery && !product.name.toLowerCase().includes(searchQuery) && !itemCode.toLowerCase().includes(searchQuery)) return;
 
-            const { daysLeft, badge } = getExpiryStatus(product.expiry);
+            const { daysLeft, isExpired, isWarning, badge } = checkExpiryLogic(product.production, product.expiry);
             
             let isFirstForThisName = false;
             let fifoClass = 'fifo-next'; 
@@ -398,8 +432,8 @@
             }
 
             if (currentFilter === 'fifo' && !isFirstForThisName) return;
-            if (currentFilter === 'warning' && (daysLeft < 0 || daysLeft > 15)) return;
-            if (currentFilter === 'expired' && daysLeft >= 0) return;
+            if (currentFilter === 'warning' && !isWarning) return;
+            if (currentFilter === 'expired' && !isExpired) return;
 
             visibleRows++;
             const row = document.createElement('tr');
@@ -410,16 +444,20 @@
                 <td><span class="badge" style="background:#57606f; font-family:monospace; font-size:12px;">${itemCode || '---'}</span></td>
                 <td><b>${product.name}</b></td>
                 <td><b>${product.qty}</b></td>
+                <td>${product.production}</td>
                 <td>${product.expiry}</td>
                 <td>${daysLeft < 0 ? `منتهي` : `${daysLeft} يوم`}</td>
                 <td>${badge}</td>
-                <td><button class="btn-delete" onclick="deleteBatch(${originalIndex})">حذف 🗑️</button></td>
+                <td>
+                    <button class="btn-edit" onclick="editBatch(${originalIndex})">تعديل ✏️</button>
+                    <button class="btn-delete" onclick="deleteBatch(${originalIndex})">حذف 🗑️</button>
+                </td>
             `;
             productTableBody.appendChild(row);
         });
 
         if (visibleRows === 0) {
-            productTableBody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:#747d8c; padding: 30px;">لا توجد أصناف تطابق معايير الفلترة أو البحث الحالية.</td></tr>`;
+            productTableBody.innerHTML = `<tr><td colspan="9" style="text-align:center; color:#747d8c; padding: 30px;">لا توجد أصناف تطابق معايير الفلترة أو البحث الحالية.</td></tr>`;
         }
     }
 
@@ -428,12 +466,65 @@
         const code = document.getElementById('prodCode').value.trim();
         const name = document.getElementById('prodName').value.trim();
         const qty = parseInt(document.getElementById('prodQty').value);
+        const production = formatDateShort(document.getElementById('prodProduction').value);
         const expiry = formatDateShort(document.getElementById('prodExpiry').value);
 
-        products.push({ code, name, qty, expiry });
+        if (new Date(production) >= new Date(expiry)) {
+            alert("خطأ: يجب أن يكون تاريخ الإنتاج قبل تاريخ انتهاء الصلاحية!");
+            return;
+        }
+
+        // ميزة 3: التحقق التلقائي إذا كان هناك شحنة بنفس (الكود، الاسم، وتاريخ الإنتاج والانتهاء) لجمع الكميتين معاً
+        const existingBatchIndex = products.findIndex(p => 
+            p.code.toLowerCase() === code.toLowerCase() && 
+            p.name.toLowerCase() === name.toLowerCase() && 
+            p.production === production && 
+            p.expiry === expiry
+        );
+
+        if (existingBatchIndex !== -1) {
+            // صنف متطابق تماماً، نقوم بجمع الكميات
+            products[existingBatchIndex].qty += qty;
+            alert(`تم رصد شحنة متطابقة تماماً بنفس التواريخ، تم دمج الكميتين ليصبح الإجمالي: ${products[existingBatchIndex].qty}`);
+        } else {
+            // شحنة جديدة أو تاريخ مختلف، يتم إضافتها كسطر منفصل
+            products.push({ code, name, qty, production, expiry });
+        }
+
         productForm.reset();
         await syncWithCloud();
     });
+
+    // ميزة 2: دالة تعديل بيانات صنف من الجدول مباشرة
+    async function editBatch(index) {
+        const product = products[index];
+        
+        const newCode = prompt("تعديل كود الصنف:", product.code);
+        if (newCode === null) return; // إلغاء العملية
+        
+        const newName = prompt("تعديل اسم الصنف:", product.name);
+        if (!newName) return;
+        
+        const newQty = parseInt(prompt("تعديل الكمية المتاحة:", product.qty));
+        if (isNaN(newQty) || newQty < 0) return;
+        
+        const newProduction = prompt("تعديل تاريخ الإنتاج (YYYY-MM-DD):", product.production);
+        if (!newProduction) return;
+        
+        const newExpiry = prompt("تعديل تاريخ انتهاء الصلاحية (YYYY-MM-DD):", product.expiry);
+        if (!newExpiry) return;
+
+        // تطبيق التعديلات
+        products[index] = {
+            code: newCode.trim(),
+            name: newName.trim(),
+            qty: newQty,
+            production: formatDateShort(newProduction),
+            expiry: formatDateShort(newExpiry)
+        };
+
+        await syncWithCloud();
+    }
 
     async function handleDispatch(actionType) {
         const targetName = dispatchNameSelect.value;
@@ -477,11 +568,15 @@
                 const returnExpiryInput = prompt(`لم يتم العثور على شحنة نشطة لهذا الصنف. يرجى إدخال تاريخ انتهاء الصلاحية للمواد المرتجعة بصيغة (YYYY-MM-DD):`);
                 if (!returnExpiryInput) return;
                 
+                const returnProductionInput = prompt(`يرجى إدخال تاريخ الإنتاج للمواد المرتجعة بصيغة (YYYY-MM-DD):`);
+                
                 const returnExpiry = formatDateShort(returnExpiryInput);
+                const returnProduction = returnProductionInput ? formatDateShort(returnProductionInput) : formatDateShort(new Date());
+                
                 const existingProd = products.find(p => p.name === targetName);
                 const returnCode = existingProd ? existingProd.code : '';
                 
-                products.push({ code: returnCode, name: targetName, qty: requestedQty, expiry: returnExpiry });
+                products.push({ code: returnCode, name: targetName, qty: requestedQty, production: returnProduction, expiry: returnExpiry });
             }
         }
 
@@ -516,24 +611,24 @@
                   '    <Cell><Data ss:Type="String">كود الصنف</Data></Cell>\n' +
                   '    <Cell><Data ss:Type="String">اسم المادة الخام / الصنف</Data></Cell>\n' +
                   '    <Cell><Data ss:Type="String">الكمية المتاحة بالرصيد</Data></Cell>\n' +
+                  '    <Cell><Data ss:Type="String">تاريخ الإنتاج</Data></Cell>\n' +
                   '    <Cell><Data ss:Type="String">تاريخ انتهاء الصلاحية</Data></Cell>\n' +
                   '    <Cell><Data ss:Type="String">الأيام المتبقية</Data></Cell>\n' +
                   '    <Cell><Data ss:Type="String">حالة جودة الصلاحية</Data></Cell>\n' +
                   '   </Row>\n';
 
         products.forEach(p => {
-            const today = new Date(); today.setHours(0,0,0,0);
-            const expiryDate = new Date(p.expiry); expiryDate.setHours(0,0,0,0);
-            const daysLeft = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
+            const { daysLeft, isExpired, isWarning } = checkExpiryLogic(p.production, p.expiry);
             
             let statusStr = "آمن وصالح";
-            if (daysLeft < 0) statusStr = "منتهي الصلاحية";
-            else if (daysLeft <= 15) statusStr = "استهلاك سريع (خطر)";
+            if (isExpired) statusStr = "منتهي الصلاحية";
+            else if (isWarning) statusStr = "استهلاك سريع (خطر - أقل من 10%)";
 
             xml += '   <Row>\n' +
                    `    <Cell><Data ss:Type="String">${p.code || ''}</Data></Cell>\n` +
                    `    <Cell><Data ss:Type="String">${p.name}</Data></Cell>\n` +
                    `    <Cell><Data ss:Type="Number">${p.qty}</Data></Cell>\n` +
+                   `    <Cell><Data ss:Type="String">${p.production}</Data></Cell>\n` +
                    `    <Cell><Data ss:Type="String">${p.expiry}</Data></Cell>\n` +
                    `    <Cell><Data ss:Type="String">${daysLeft < 0 ? "منتهي" : daysLeft + " يوم"}</Data></Cell>\n` +
                    `    <Cell><Data ss:Type="String">${statusStr}</Data></Cell>\n` +
