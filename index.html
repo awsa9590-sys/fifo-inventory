@@ -24,7 +24,7 @@
         .header-bar h1 { margin: 0; font-size: 32px; font-weight: 800; letter-spacing: 0.5px; }
         .subtitle { color: #a4b0be; margin-top: 10px; font-size: 15px; font-weight: 500; }
         
-        /* لوحة المؤشرات السريعة (Dashboard Widgets) */
+        /* لوحة المؤشرات السريعة */
         .dashboard-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; margin-bottom: 25px; }
         .stat-card { background: white; padding: 20px; border-radius: 12px; box-shadow: var(--card-shadow); text-align: center; border-top: 4px solid #ccc; transition: transform 0.2s; }
         .stat-card:hover { transform: translateY(-3px); }
@@ -208,8 +208,8 @@
 </div>
 
 <script>
-    // ضع رابط الـ Apps Script المحدث الخاص بك هنا ليعمل الربط السحابي بشكل ممتاز
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwNaqCZC-2myLLB6iz868nhKPzIGDo5poRDQarmcCu-AWLghm-okKeS8A9bseFV8z53Tg/exec";
+    // ضع رابط الـ Apps Script الجديد والمحدث بالأسفل هنا لضمان تفعيل الحقول الخمسة كاملة
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyCCXsJTRqbdiBzGU6PfVDmRxQI0oCPJkfWfqIur9REJaJIwHqq5UB0NZk51kjHPanHYA/exec";
 
     const productForm = document.getElementById('productForm');
     const dispatchForm = document.getElementById('dispatchForm');
@@ -268,12 +268,11 @@
         renderTable();
     }
 
-    // ميزة 1: دالة جلب الاسم بمجرد إدخال الكود
+    // جلب اسم الصنف تلقائياً بمجرد إدخال الكود المسجل مسبقاً
     function autoFillNameByCode() {
         const inputCode = document.getElementById('prodCode').value.trim().toLowerCase();
         if(!inputCode) return;
         
-        // البحث في المنتجات المحملة عن صنف يحمل نفس الكود
         const foundProduct = products.find(p => p.code.toLowerCase() === inputCode);
         if(foundProduct) {
             document.getElementById('prodName').value = foundProduct.name;
@@ -293,11 +292,6 @@
                     let qty = parseInt(item.qty || item[2]) || 0;
                     let production = item.production || item[3] || '';
                     let expiry = item.expiry || item[4] || '';
-                    
-                    if (!expiry && production) {
-                        expiry = production;
-                        production = formatDateShort(new Date()); 
-                    }
 
                     return {
                         code: code.toString().trim(),
@@ -344,7 +338,8 @@
     async function syncWithCloud() {
         toggleControls(true);
         
-        products = products.map(p => ({
+        // إعادة ترتيب وتأكيد الحقول بالكامل قبل الدفع للسحاب
+        const sanitizedProducts = products.map(p => ({
             code: (p.code || '').toString().trim(),
             name: p.name.toString().trim(),
             qty: parseInt(p.qty) || 0,
@@ -355,7 +350,7 @@
         try {
             await fetch(SCRIPT_URL, {
                 method: 'POST',
-                body: JSON.stringify({ products: products })
+                body: JSON.stringify({ products: sanitizedProducts })
             });
             
             calculateDashboardStats();
@@ -474,7 +469,7 @@
             return;
         }
 
-        // ميزة 3: التحقق التلقائي إذا كان هناك شحنة بنفس (الكود، الاسم، وتاريخ الإنتاج والانتهاء) لجمع الكميتين معاً
+        // دمج الشحنات المتطابقة تماماً بنفس التواريخ
         const existingBatchIndex = products.findIndex(p => 
             p.code.toLowerCase() === code.toLowerCase() && 
             p.name.toLowerCase() === name.toLowerCase() && 
@@ -483,11 +478,9 @@
         );
 
         if (existingBatchIndex !== -1) {
-            // صنف متطابق تماماً، نقوم بجمع الكميات
             products[existingBatchIndex].qty += qty;
             alert(`تم رصد شحنة متطابقة تماماً بنفس التواريخ، تم دمج الكميتين ليصبح الإجمالي: ${products[existingBatchIndex].qty}`);
         } else {
-            // شحنة جديدة أو تاريخ مختلف، يتم إضافتها كسطر منفصل
             products.push({ code, name, qty, production, expiry });
         }
 
@@ -495,12 +488,12 @@
         await syncWithCloud();
     });
 
-    // ميزة 2: دالة تعديل بيانات صنف من الجدول مباشرة
+    // تعديل بيانات الشحنة من الجدول مباشرة
     async function editBatch(index) {
         const product = products[index];
         
         const newCode = prompt("تعديل كود الصنف:", product.code);
-        if (newCode === null) return; // إلغاء العملية
+        if (newCode === null) return; 
         
         const newName = prompt("تعديل اسم الصنف:", product.name);
         if (!newName) return;
@@ -514,7 +507,6 @@
         const newExpiry = prompt("تعديل تاريخ انتهاء الصلاحية (YYYY-MM-DD):", product.expiry);
         if (!newExpiry) return;
 
-        // تطبيق التعديلات
         products[index] = {
             code: newCode.trim(),
             name: newName.trim(),
