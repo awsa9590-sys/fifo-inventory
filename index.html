@@ -13,6 +13,7 @@
             --warning: #ffa502; 
             --danger: #ff4757; 
             --fifo-color: #1e90ff;
+            --info-color: #70a1ff;
             --bg-color: #f1f2f6;
             --card-shadow: 0 10px 20px rgba(0,0,0,0.05), 0 2px 6px rgba(0,0,0,0.05);
         }
@@ -24,16 +25,22 @@
         .header-bar h1 { margin: 0; font-size: 32px; font-weight: 800; letter-spacing: 0.5px; }
         .subtitle { color: #a4b0be; margin-top: 10px; font-size: 15px; font-weight: 500; }
         
+        /* صندوق التنبيهات العام */
+        .alerts-banner { display: none; background: #fff; border-right: 6px solid var(--danger); padding: 15px 20px; border-radius: 12px; margin-bottom: 25px; box-shadow: var(--card-shadow); }
+        .alerts-banner h4 { margin: 0 0 8px 0; color: var(--danger); font-size: 16px; display: flex; align-items: center; gap: 8px; }
+        .alerts-banner ul { margin: 0; padding-right: 20px; font-size: 13px; color: #2f3542; }
+
         /* لوحة المؤشرات السريعة */
-        .dashboard-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 15px; margin-bottom: 25px; }
+        .dashboard-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 25px; }
         .stat-card { background: white; padding: 20px; border-radius: 12px; box-shadow: var(--card-shadow); text-align: center; border-top: 4px solid #ccc; transition: transform 0.2s; }
         .stat-card:hover { transform: translateY(-3px); }
         .stat-card.total-items { border-top-color: var(--fifo-color); }
         .stat-card.total-qty { border-top-color: var(--success); }
-        .stat-card.warning-items { border-top-color: var(--warning); }
-        .stat-card.danger-items { border-top-color: var(--danger); }
-        .stat-card h4 { margin: 0; color: #747d8c; font-size: 14px; text-transform: uppercase; }
-        .stat-card .value { font-size: 26px; font-weight: bold; margin-top: 10px; color: var(--primary); }
+        .stat-card.min-warning { border-top-color: var(--danger); }
+        .stat-card.max-warning { border-top-color: var(--warning); }
+        .stat-card.danger-items { border-top-color: #e84118; }
+        .stat-card h4 { margin: 0; color: #747d8c; font-size: 13px; text-transform: uppercase; }
+        .stat-card .value { font-size: 24px; font-weight: bold; margin-top: 10px; color: var(--primary); }
 
         .grid-forms { display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 25px; margin-bottom: 25px; }
         .card { background: white; padding: 25px; border-radius: 16px; box-shadow: var(--card-shadow); border: 1px solid rgba(0,0,0,0.02); }
@@ -72,18 +79,19 @@
         /* تجميل الجدول */
         .table-container { overflow-x: auto; background: white; border-radius: 16px; box-shadow: var(--card-shadow); border: 1px solid rgba(0,0,0,0.02); }
         table { width: 100%; border-collapse: collapse; text-align: right; }
-        th, td { padding: 16px; border-bottom: 1px solid #f1f2f6; }
+        th, td { padding: 14px 12px; border-bottom: 1px solid #f1f2f6; white-space: nowrap; }
         th { background-color: #fafafa; color: #57606f; font-size: 13px; font-weight: 700; border-bottom: 2px solid #eedfdf; }
         tr:last-child td { border-bottom: none; }
         tr:hover td { background-color: #f8f9fa; }
         
         /* شارات الحالات المتقدمة */
-        .badge { padding: 6px 14px; border-radius: 50px; color: white; font-size: 11px; font-weight: bold; display: inline-block; text-align: center; }
+        .badge { padding: 5px 10px; border-radius: 50px; color: white; font-size: 11px; font-weight: bold; display: inline-block; text-align: center; }
         .badge-safe { background-color: var(--success); }
         .badge-warning { background-color: var(--warning); color: #fff; }
-        .badge-expired { background-color: var(--danger); }
+        .badge-danger { background-color: var(--danger); }
+        .badge-info { background-color: var(--info-color); }
         
-        .badge-fifo { background-color: #fff3cd; color: #b7791f; border: 1px solid #fbd38d; padding: 5px 12px; border-radius: 6px; font-size: 11px; font-weight: 700; display: inline-block; }
+        .badge-fifo { background-color: #fff3cd; color: #b7791f; border: 1px solid #fbd38d; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; display: inline-block; }
         .fifo-first { background-color: #fffaf0; border-right: 4px solid var(--warning); }
         .fifo-next { border-right: 4px solid #ced6e0; }
 
@@ -95,33 +103,43 @@
 <div class="container">
     <div class="header-bar">
         <h1>🍔 نظام إدارة مخزون وصلاحيات بافلو برجر (FIFO Pro)</h1>
-        <div class="subtitle">منظومة المراقبة الذكية والمزامنة الفورية للأرصدة والمواد الخام بالسحاب</div>
+        <div class="subtitle">منظومة المراقبة الذكية ومتابعة حد الاستهلاك الشهري والتنبيهات المباشرة</div>
     </div>
 
     <div id="loading">🔄 جاري الاتصال بخوادم قاعدة البيانات ومزامنة الأرصدة حياً...</div>
 
+    <!-- شريط التنبيهات الذكي -->
+    <div class="alerts-banner" id="alertsBanner">
+        <h4>🚨 تنبيهات المخزون والاستهلاك الشهري:</h4>
+        <ul id="alertsList"></ul>
+    </div>
+
     <div class="dashboard-stats">
         <div class="stat-card total-items">
-            <h4>إصدارات الأصناف حالياً</h4>
+            <h4>إصدارات الأصناف</h4>
             <div class="value" id="statUniqueItems">0</div>
         </div>
         <div class="stat-card total-qty">
             <h4>إجمالي كميات المخزون</h4>
             <div class="value" id="statTotalQty">0</div>
         </div>
-        <div class="stat-card warning-items">
-            <h4>شحنات حرجة (أقل من 10% صلاحية)</h4>
-            <div class="value" id="statWarningItems" style="color: var(--warning);">0</div>
+        <div class="stat-card min-warning">
+            <h4>أصناف أقل من الحد الأدنى ⚠️</h4>
+            <div class="value" id="statMinWarning" style="color: var(--danger);">0</div>
+        </div>
+        <div class="stat-card max-warning">
+            <h4>أصناف تجاوزت الحد الأقصى 📈</h4>
+            <div class="value" id="statMaxWarning" style="color: var(--warning);">0</div>
         </div>
         <div class="stat-card danger-items">
-            <h4>شحنات تالفة/منتهية</h4>
-            <div class="value" id="statExpiredItems" style="color: var(--danger);">0</div>
+            <h4>شحنات منتهية / حرجة</h4>
+            <div class="value" id="statExpiredItems" style="color: #e84118;">0</div>
         </div>
     </div>
 
     <div class="grid-forms">
         <div class="card">
-            <h3>📥 توريد شحنة خامات جديدة</h3>
+            <h3>📥 توريد شحنة وضبط الحدود</h3>
             <form id="productForm" class="form-group">
                 <div class="form-row">
                     <div>
@@ -143,8 +161,23 @@
                         <input type="date" id="prodProduction" required>
                     </div>
                     <div>
-                        <label>تاريخ انتهاء الصلاحية:</label>
+                        <label>تاريخ الانتهاء:</label>
                         <input type="date" id="prodExpiry" required>
+                    </div>
+                </div>
+                <!-- الحدود والإنذارات الاستهلاكية -->
+                <div class="form-triple">
+                    <div>
+                        <label>الاستهلاك الشهري المتوقع:</label>
+                        <input type="number" id="prodMonthlyTarget" step="any" min="0" placeholder="مثال: 500">
+                    </div>
+                    <div>
+                        <label>الحد الأدنى للأمان:</label>
+                        <input type="number" id="prodMinLimit" step="any" min="0" placeholder="مثال: 50">
+                    </div>
+                    <div>
+                        <label>الحد الأقصى للمخزن:</label>
+                        <input type="number" id="prodMaxLimit" step="any" min="0" placeholder="مثال: 1000">
                     </div>
                 </div>
                 <button type="submit" id="btnAddSubmit" class="btn-add">تأكيد وحفظ الشحنة بالسحاب ➕</button>
@@ -180,7 +213,9 @@
             <div class="filter-buttons">
                 <button class="filter-btn active" id="filterAll" onclick="setFilter('all')">الكل</button>
                 <button class="filter-btn" id="filterFifo" onclick="setFilter('fifo')">الأولوية الأولى (FIFO)</button>
-                <button class="filter-btn" id="filterWarning" onclick="setFilter('warning')">المتبقي أقل من 10% ⚠️</button>
+                <button class="filter-btn" id="filterMin" onclick="setFilter('min')">تحت الحد الأدنى 🔻</button>
+                <button class="filter-btn" id="filterMax" onclick="setFilter('max')">فوق الحد الأقصى 🔺</button>
+                <button class="filter-btn" id="filterWarning" onclick="setFilter('warning')">أقل من 10% صلاحية ⚠️</button>
                 <button class="filter-btn" id="filterExpired" onclick="setFilter('expired')">المنتهي ❌</button>
                 <button class="btn-excel" id="btnExportExcel" onclick="exportToExcel()">تصدير إلى Excel 📊</button>
             </div>
@@ -193,10 +228,12 @@
                         <th>أولوية السحب</th>
                         <th>كود الصنف</th>
                         <th>اسم الصنف</th>
-                        <th>الكمية المتاحة</th>
-                        <th>تاريخ الإنتاج</th>
+                        <th>المتاح / الإجمالي</th>
+                        <th>معدل الاستهلاك الشهري</th>
+                        <th>الحد الأدنى/الأقصى</th>
+                        <th>حالة الرصيد والحدود</th>
                         <th>تاريخ الانتهاء</th>
-                        <th>الأيام المتبقية للانتهاء</th>
+                        <th>الأيام المتبقية</th>
                         <th>حالة الصلاحية</th>
                         <th>إجراءات</th>
                     </tr>
@@ -208,7 +245,7 @@
 </div>
 
 <script>
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyCCXsJTRqbdiBzGU6PfVDmRxQI0oCPJkfWfqIur9REJaJIwHqq5UB0NZk51kjHPanHYA/exec";
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzZiz4hrlYQWqIxOQsfLZiSbIlkRwSBj9-dJvJfm14S2jBy5MuBYF6wkOWHUKxPaVob_A/exec";
 
     const productForm = document.getElementById('productForm');
     const dispatchForm = document.getElementById('dispatchForm');
@@ -292,6 +329,9 @@
         const foundProduct = products.find(p => p.code.toLowerCase() === inputCode);
         if(foundProduct) {
             document.getElementById('prodName').value = foundProduct.name;
+            if (foundProduct.monthlyTarget) document.getElementById('prodMonthlyTarget').value = foundProduct.monthlyTarget;
+            if (foundProduct.minLimit) document.getElementById('prodMinLimit').value = foundProduct.minLimit;
+            if (foundProduct.maxLimit) document.getElementById('prodMaxLimit').value = foundProduct.maxLimit;
         }
     }
 
@@ -308,13 +348,19 @@
                     let qty = parseFloat(item.qty || item[2]) || 0;
                     let production = item.production || item[3] || '';
                     let expiry = item.expiry || item[4] || '';
+                    let monthlyTarget = parseFloat(item.monthlyTarget || item[5]) || 0;
+                    let minLimit = parseFloat(item.minLimit || item[6]) || 0;
+                    let maxLimit = parseFloat(item.maxLimit || item[7]) || 0;
 
                     return {
                         code: code.toString().trim(),
                         name: name.toString().trim(),
                         qty: qty,
                         production: formatDateShort(production),
-                        expiry: formatDateShort(expiry)
+                        expiry: formatDateShort(expiry),
+                        monthlyTarget: monthlyTarget,
+                        minLimit: minLimit,
+                        maxLimit: maxLimit
                     };
                 }).filter(p => p.qty > 0);
             } else {
@@ -333,22 +379,52 @@
     }
 
     function calculateDashboardStats() {
-        const uniqueItems = [...new Set(products.map(p => p.name))].length;
+        const uniqueNames = [...new Set(products.map(p => p.name))];
         const totalQty = products.reduce((sum, p) => sum + p.qty, 0);
         
-        let warningCount = 0;
+        let minWarningCount = 0;
+        let maxWarningCount = 0;
         let expiredCount = 0;
-        
-        products.forEach(p => {
-            const { isExpired, isWarning } = checkExpiryLogic(p.production, p.expiry);
-            if (isExpired) expiredCount++;
-            else if (isWarning) warningCount++;
+        const alertsList = [];
+
+        uniqueNames.forEach(name => {
+            const itemBatches = products.filter(p => p.name === name);
+            const totalItemQty = itemBatches.reduce((sum, p) => sum + p.qty, 0);
+            const sample = itemBatches[0];
+
+            if (sample.minLimit > 0 && totalItemQty < sample.minLimit) {
+                minWarningCount++;
+                alertsList.push(`الرصيد المتاح لـ (<b>${name}</b>) هو <b>${totalItemQty}</b> وهو أقل من الحد الأدنى المقرر (<b>${sample.minLimit}</b>). يرجى إصدار أمر توريد.`);
+            }
+            if (sample.maxLimit > 0 && totalItemQty > sample.maxLimit) {
+                maxWarningCount++;
+                alertsList.push(`الرصيد المتاح لـ (<b>${name}</b>) هو <b>${totalItemQty}</b> وهو يتجاوز الحد الأقصى للمخزن (<b>${sample.maxLimit}</b>).`);
+            }
+            if (sample.monthlyTarget > 0 && totalItemQty > sample.monthlyTarget * 1.5) {
+                alertsList.push(`تنبيه استهلاك: مخزون (<b>${name}</b>) يتجاوز معدل الاستهلاك الشهري (<b>${sample.monthlyTarget}</b>) بـ 50% أو أكثر.`);
+            }
         });
 
-        document.getElementById('statUniqueItems').textContent = uniqueItems;
+        products.forEach(p => {
+            const { isExpired } = checkExpiryLogic(p.production, p.expiry);
+            if (isExpired) expiredCount++;
+        });
+
+        document.getElementById('statUniqueItems').textContent = uniqueNames.length;
         document.getElementById('statTotalQty').textContent = Number(totalQty.toFixed(3));
-        document.getElementById('statWarningItems').textContent = warningCount;
+        document.getElementById('statMinWarning').textContent = minWarningCount;
+        document.getElementById('statMaxWarning').textContent = maxWarningCount;
         document.getElementById('statExpiredItems').textContent = expiredCount;
+
+        // عرض التنبيهات علوياً
+        const alertsBanner = document.getElementById('alertsBanner');
+        const alertsListUl = document.getElementById('alertsList');
+        if (alertsList.length > 0) {
+            alertsListUl.innerHTML = alertsList.map(a => `<li>${a}</li>`).join('');
+            alertsBanner.style.display = 'block';
+        } else {
+            alertsBanner.style.display = 'none';
+        }
     }
 
     async function syncWithCloud() {
@@ -366,7 +442,10 @@
                 name: String(p.name).trim(),
                 qty: parseFloat(p.qty) || 0,
                 production: prodDate,
-                expiry: expDate
+                expiry: expDate,
+                monthlyTarget: parseFloat(p.monthlyTarget) || 0,
+                minLimit: parseFloat(p.minLimit) || 0,
+                maxLimit: parseFloat(p.maxLimit) || 0
             };
         }).filter(p => p.qty > 0);
 
@@ -402,14 +481,13 @@
             return { daysLeft: isNaN(daysLeft) ? 0 : daysLeft, isExpired: true, isWarning: false, badge: '<span class="badge badge-danger">منتهي الصلاحية ❌</span>' };
         }
         
-        // حساب عتبة الـ 10% من إجمالي عمر الصنف
         const warningThresholdMs = totalLifetimeMs * 0.10;
         
         if (remainingLifetimeMs <= warningThresholdMs) {
             return { daysLeft, isExpired: false, isWarning: true, badge: '<span class="badge badge-warning">حرِج (أقل من 10%) ⚠️</span>' };
         }
         
-        return { daysLeft, isExpired: false, isWarning: false, badge: '<span class="badge badge-success">آمن وصالح ✅</span>' };
+        return { daysLeft, isExpired: false, isWarning: false, badge: '<span class="badge badge-safe">آمن وصالح ✅</span>' };
     }
 
     function updateSelectOptions() {
@@ -432,6 +510,12 @@
         const trackedFirst = {};
         let visibleRows = 0;
 
+        // حساب إجماليات الأصناف لمعرفة الحدود
+        const totalQtyPerName = {};
+        products.forEach(p => {
+            totalQtyPerName[p.name] = (totalQtyPerName[p.name] || 0) + p.qty;
+        });
+
         products.forEach((product, originalIndex) => {
             if (product.qty <= 0) return;
             
@@ -440,6 +524,14 @@
 
             const { daysLeft, isExpired, isWarning, badge } = checkExpiryLogic(product.production, product.expiry);
             
+            const itemTotalQty = totalQtyPerName[product.name] || 0;
+            const isBelowMin = product.minLimit > 0 && itemTotalQty < product.minLimit;
+            const isAboveMax = product.maxLimit > 0 && itemTotalQty > product.maxLimit;
+
+            let stockBadge = '<span class="badge badge-safe">طبيعي ✅</span>';
+            if (isBelowMin) stockBadge = '<span class="badge badge-danger">أقل من الحد الأدنى 🔻</span>';
+            else if (isAboveMax) stockBadge = '<span class="badge badge-warning">تجاوز الحد الأقصى 🔺</span>';
+
             let isFirstForThisName = false;
             let fifoClass = 'fifo-next'; 
             let fifoLabel = 'شحنة تالية ⏳';
@@ -452,6 +544,8 @@
             }
 
             if (currentFilter === 'fifo' && !isFirstForThisName) return;
+            if (currentFilter === 'min' && !isBelowMin) return;
+            if (currentFilter === 'max' && !isAboveMax) return;
             if (currentFilter === 'warning' && !isWarning) return;
             if (currentFilter === 'expired' && !isExpired) return;
 
@@ -463,8 +557,10 @@
                 <td><span class="badge-fifo">${fifoLabel}</span></td>
                 <td><span class="badge" style="background:#57606f; font-family:monospace; font-size:12px;">${itemCode.replace(/'/g, '') || '---'}</span></td>
                 <td><b>${product.name}</b></td>
-                <td><b>${Number(product.qty.toFixed(3))}</b></td>
-                <td>${product.production.replace(/'/g, '')}</td>
+                <td><b>${Number(product.qty.toFixed(3))}</b> <span style="font-size:11px; color:#747d8c;">(إجمالي: ${Number(itemTotalQty.toFixed(3))})</span></td>
+                <td>${product.monthlyTarget || '---'}</td>
+                <td><small>أدنى: ${product.minLimit || '---'} / أقصى: ${product.maxLimit || '---'}</small></td>
+                <td>${stockBadge}</td>
                 <td>${product.expiry.replace(/'/g, '')}</td>
                 <td><b>${daysLeft < 0 ? 'منتهي' : daysLeft + ' يوم'}</b></td>
                 <td>${badge}</td>
@@ -477,7 +573,7 @@
         });
 
         if (visibleRows === 0) {
-            productTableBody.innerHTML = `<tr><td colspan="9" style="text-align:center; color:#747d8c; padding: 30px;">لا توجد أصناف تطابق معايير الفلترة أو البحث الحالية.</td></tr>`;
+            productTableBody.innerHTML = `<tr><td colspan="11" style="text-align:center; color:#747d8c; padding: 30px;">لا توجد أصناف تطابق معايير الفلترة أو البحث الحالية.</td></tr>`;
         }
     }
 
@@ -488,6 +584,9 @@
         const qty = parseFloat(document.getElementById('prodQty').value);
         const production = formatDateShort(document.getElementById('prodProduction').value);
         const expiry = formatDateShort(document.getElementById('prodExpiry').value);
+        const monthlyTarget = parseFloat(document.getElementById('prodMonthlyTarget').value) || 0;
+        const minLimit = parseFloat(document.getElementById('prodMinLimit').value) || 0;
+        const maxLimit = parseFloat(document.getElementById('prodMaxLimit').value) || 0;
 
         if (parseCustomDate(production) >= parseCustomDate(expiry)) {
             alert("خطأ: يجب أن يكون تاريخ الإنتاج قبل تاريخ انتهاء الصلاحية!");
@@ -503,9 +602,12 @@
 
         if (existingBatchIndex !== -1) {
             products[existingBatchIndex].qty += qty;
+            products[existingBatchIndex].monthlyTarget = monthlyTarget || products[existingBatchIndex].monthlyTarget;
+            products[existingBatchIndex].minLimit = minLimit || products[existingBatchIndex].minLimit;
+            products[existingBatchIndex].maxLimit = maxLimit || products[existingBatchIndex].maxLimit;
             alert(`تم رصد شحنة متطابقة تماماً بنفس التواريخ، تم دمج الكميتين ليصبح الإجمالي: ${Number(products[existingBatchIndex].qty.toFixed(3))}`);
         } else {
-            products.push({ code, name, qty, production, expiry });
+            products.push({ code, name, qty, production, expiry, monthlyTarget, minLimit, maxLimit });
         }
 
         productForm.reset();
@@ -523,6 +625,10 @@
         
         const newQty = parseFloat(prompt("تعديل الكمية المتاحة:", product.qty));
         if (isNaN(newQty) || newQty < 0) return;
+
+        const newTarget = parseFloat(prompt("تعديل الاستهلاك الشهري المتوقع:", product.monthlyTarget || 0));
+        const newMin = parseFloat(prompt("تعديل الحد الأدنى:", product.minLimit || 0));
+        const newMax = parseFloat(prompt("تعديل الحد الأقصى:", product.maxLimit || 0));
         
         const newProduction = prompt("تعديل تاريخ الإنتاج (DD/MM/YYYY):", product.production.replace(/'/g, ''));
         if (!newProduction) return;
@@ -534,6 +640,9 @@
             code: newCode.trim(),
             name: newName.trim(),
             qty: newQty,
+            monthlyTarget: isNaN(newTarget) ? 0 : newTarget,
+            minLimit: isNaN(newMin) ? 0 : newMin,
+            maxLimit: isNaN(newMax) ? 0 : newMax,
             production: formatDateShort(newProduction),
             expiry: formatDateShort(newExpiry)
         };
@@ -591,7 +700,16 @@
                 const existingProd = products.find(p => p.name === targetName);
                 const returnCode = existingProd ? existingProd.code : '';
                 
-                products.push({ code: returnCode, name: targetName, qty: requestedQty, production: returnProduction, expiry: returnExpiry });
+                products.push({ 
+                    code: returnCode, 
+                    name: targetName, 
+                    qty: requestedQty, 
+                    production: returnProduction, 
+                    expiry: returnExpiry,
+                    monthlyTarget: existingProd ? existingProd.monthlyTarget : 0,
+                    minLimit: existingProd ? existingProd.minLimit : 0,
+                    maxLimit: existingProd ? existingProd.maxLimit : 0
+                });
             }
         }
 
@@ -626,6 +744,9 @@
                   '    <Cell><Data ss:Type="String">كود الصنف</Data></Cell>\n' +
                   '    <Cell><Data ss:Type="String">اسم المادة الخام / الصنف</Data></Cell>\n' +
                   '    <Cell><Data ss:Type="String">الكمية المتاحة بالرصيد</Data></Cell>\n' +
+                  '    <Cell><Data ss:Type="String">الاستهلاك الشهري المتوقع</Data></Cell>\n' +
+                  '    <Cell><Data ss:Type="String">الحد الأدنى</Data></Cell>\n' +
+                  '    <Cell><Data ss:Type="String">الحد الأقصى</Data></Cell>\n' +
                   '    <Cell><Data ss:Type="String">تاريخ الإنتاج</Data></Cell>\n' +
                   '    <Cell><Data ss:Type="String">تاريخ انتهاء الصلاحية</Data></Cell>\n' +
                   '    <Cell><Data ss:Type="String">الأيام المتبقية للانتهاء</Data></Cell>\n' +
@@ -643,6 +764,9 @@
                    `    <Cell><Data ss:Type="String">${p.code.replace(/'/g, '') || ''}</Data></Cell>\n` +
                    `    <Cell><Data ss:Type="String">${p.name}</Data></Cell>\n` +
                    `    <Cell><Data ss:Type="Number">${p.qty}</Data></Cell>\n` +
+                   `    <Cell><Data ss:Type="Number">${p.monthlyTarget || 0}</Data></Cell>\n` +
+                   `    <Cell><Data ss:Type="Number">${p.minLimit || 0}</Data></Cell>\n` +
+                   `    <Cell><Data ss:Type="Number">${p.maxLimit || 0}</Data></Cell>\n` +
                    `    <Cell><Data ss:Type="String">${p.production.replace(/'/g, '')}</Data></Cell>\n` +
                    `    <Cell><Data ss:Type="String">${p.expiry.replace(/'/g, '')}</Data></Cell>\n` +
                    `    <Cell><Data ss:Type="String">${daysLeft < 0 ? "منتهي" : daysLeft + " يوم"}</Data></Cell>\n` +
